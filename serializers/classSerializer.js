@@ -1,0 +1,4 @@
+exports.serializeClass = (classe) => ({
+  ...classe,
+  
+});

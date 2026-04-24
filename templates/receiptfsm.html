@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Reçu de {{ student.firstname }}</title>
+    <style>
+      body {
+        font-family: "Times New Roman", Times, serif;
+        font-size: 14px;
+        margin: 30px;
+      }
+
+      .header-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+      }
+
+      .student-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid #918f8f;
+        margin-bottom: 20px;
+
+      }
+
+      .student-table td {
+        padding-top: 5px;
+      }
+
+      .summary-table {
+        padding-top: 5px;
+      }
+
+      .header-table td {
+        vertical-align: top;
+        padding: 5px;
+      }
+
+      .header-title-table {
+        margin-top: 20px;
+        margin-bottom: 20px;
+      }
+
+      table.header-title-table td{
+        border: 1px solid #534e4e;
+      }
+      
+      .header-title {
+        color:#ffffff;
+        background-color: #534e4e;
+        text-align: center;
+        font-family: cursive;
+        font-size: 14px;
+        font-weight: bold;
+        padding-top: 5px;
+        
+      }
+
+      .header-ref {
+        background-color: #ffffff;
+        text-align: center;
+        font-family: cursive;
+        font-size: 14px;
+        font-weight: bold;
+        padding-top: 5px;
+        
+      }
+
+      .section-title {
+        font-weight: bold;
+        background-color: #f0f0f0;
+        padding: 5px;
+        margin-top: 10px;
+      }
+
+      table.payements {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+
+      table.payements th,
+      table.payements td {
+        border: 1px solid #534e4e;
+        padding-top: 5px;
+        text-align: center;
+      }
+
+      table.payements th {
+        color: white;
+        background-color: #534e4e;
+      }
+
+      .totals-row td {
+        font-weight: bold;
+      }
+
+      .signature {
+        text-align: left;
+        margin-top: 20px;
+      }
+
+      .date {
+        text-align: right;
+        margin-top: 10px;
+      }
+
+    </style>
+  </head>
+  <body>
+    <!-- Header section -->
+    <table class="header-table">
+      <tr>
+        <td>
+          <strong>{{ school.name }}</strong><br />
+          Tél: {{ school.phone }}<br />
+          {{ school.address }}
+        </td>
+      </tr>
+    </table>
+
+    <!-- Date -->
+    <div class="date">
+      <strong> {{ date }} </strong>
+    </div>
+
+    <!-- Title section -->
+    <table class="header-title-table">
+      <tr>
+        <td class="header-title">Reçu de Payement</td>
+        <td class="header-ref">Réf: {{ receipt.reference }}</td>
+      </tr>
+    </table>
+
+    <!-- Student info section -->
+    <table class="student-table">
+      <tr style="background-color: #e0e0e0; font-weight: bold;">
+        <td>Elève</td>
+        <td>Tuteur</td>
+      </tr>
+      <tr>
+        <td>
+          Nom: <strong>{{ student.last_name }}</strong><br />
+          Prénom: <strong> {{ student.first_name }} </strong><br />
+          Classe: <strong> {{ student.classe.name }} </strong><br />
+        </td>
+        <td>
+          Nom: <strong>{{ parent.last_name }}</strong> <br />
+          Prénom: <strong>{{ parent.first_name }}</strong> <br />
+        </td>
+      </tr>
+    </table>
+
+    <!-- Table des payements -->
+    <table class="payements">
+      <thead>
+        <tr>
+          <th style="width: 25%;">Année scolaire</th>
+          <th style="width: 30%; ">Désignation</th>
+          <th >Mois</th>
+          <th style="width: 25%">Montant en FCFA</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>{{ receipt.school_years }}</td>
+          <td> Frais mensuels </td>
+          <td> {{ month }} </td>
+          <td>{{ receipt.total_amount }}</td>
+        </tr>
+        <tr class="totals-row">
+          <td colspan="3">MONTANT TOTAL</td>
+          <td>{{ receipt.total_amount }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Signature -->
+    <div class="signature">
+      <strong>Signature du Directeur:</strong>
+    </div>
+
+
+  </body>
+</html>

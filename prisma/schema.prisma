@@ -1,0 +1,650 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+////////////////////////// CustomUser ///////////////////
+
+model CustomUser {
+  id        Int      @id @default(autoincrement())
+  username   String   @unique
+  email      String   @unique
+  first_name String?
+  last_name  String?
+  password   String
+  role       String   @default("student")
+  tel        String?
+  address   String?
+  gender    String?
+  img       String?  @default("users/avatar.png")
+  isActive  Boolean  @default(true)  @map("is_active")
+  
+  // Relations
+  paymentMethods   PaymentMethod[]
+  paymentHistories PaymentHistory[]
+  admins           Admin[]
+  parents          Parent[]
+  accounts         Student[] @relation("student_account")
+  teachers         Teacher[]
+  sentMessages     Message[] @relation("sent_messages")
+  receivedMessages Message[] @relation("received_messages")
+  refreshTokens    RefreshToken[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  last_login DateTime?
+
+}
+
+/////////////////////// RefreshToken /////////////////////
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int
+  user      CustomUser @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  revoked   Boolean  @default(false)
+}
+
+/////////////////////// VerificationCode /////////////////
+
+model VerificationCode {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  code         String
+  date_created  DateTime @default(now())
+}
+
+/////////////////////// PaymentType ////////////////////////
+
+model PaymentType {
+  id   Int    @id @default(autoincrement())
+  name String @default("enrollment")
+
+  paymentHistories PaymentHistory[]
+}
+
+/////////////////////// PaymentMethod //////////////////////
+
+model PaymentMethod {
+  id             Int        @id @default(autoincrement())
+  cart_name       String
+  cart_number     String
+  expiration_month String
+  expiration_year String
+  cvv            String
+
+  userId Int?
+  user   CustomUser? @relation(fields: [userId], references: [id])
+}
+
+////////////////////// PaymentHistory ///////////////////////
+
+model PaymentHistory {
+  id             Int         @id @default(autoincrement())
+  amount         Float
+  status         String @default("PENDING")
+  date           DateTime    @default(now())
+
+  userId        Int?
+  user          CustomUser?   @relation(fields: [userId], references: [id])
+
+  paymentTypeId Int?
+  paymentType   PaymentType?  @relation(fields: [paymentTypeId], references: [id])
+}
+
+
+////////////////////// Enrollement ///////////////////////////////////////
+
+model enrollement_tutor_info {
+  id_enrollement_tutor_info Int     @id @default(autoincrement())
+  firstname                 String
+  lastname                  String
+  email                     String
+  tel                       String
+  address                   String
+  gender                    String  @default("Masculin")
+  relationship              String  @default("father")
+
+  enrollements enrollement[]
+
+}
+
+model enrollement {
+  id_enrollement      Int                   @id @default(autoincrement())
+  tutorId             Int?                  // ForeignKey vers enrollement_tutor_info
+  tutor               enrollement_tutor_info? @relation(fields: [tutorId], references: [id_enrollement_tutor_info])
+  submission_date     DateTime
+  school_year         String                @default("2025-2026")
+  status              String                @default("Submitted")
+
+  students            enrollement_student_info[]
+  appointments        Appointment[]
+}
+
+model enrollement_student_info {
+  id_enrollement_student_info Int                   @id @default(autoincrement())
+  enrollementId               Int?                  
+  enrollement                 enrollement?          @relation(fields: [enrollementId], references: [id_enrollement])
+  firstname                   String
+  lastname                    String
+  gender                      String                @default("masculin")
+  cni                         String                @default("-")
+  demanded_class_levelId      Int?  
+  demanded_class_level        Grade?                @relation(fields: [demanded_class_levelId], references: [id_grade])                
+  age                         Int
+
+  supporting_documents        enrollement_supporting_dcuments[]
+  feeDetails                  EnrollementFeeDetails[]
+}
+
+model enrollement_supporting_dcuments {
+  id_enrollement_supporting_dcuments Int  @id @default(autoincrement())
+  studentId                           Int?
+  student                             enrollement_student_info? @relation(fields: [studentId], references: [id_enrollement_student_info])
+  title                               String
+  description                         String
+  document                            String
+  status                              String @default("in process")
+  created_at                           DateTime @default(now())
+}
+
+model Appointment {
+  id_appointment Int       @id @default(autoincrement())
+  enrollmentId   Int?
+  enrollment     enrollement? @relation(fields: [enrollmentId], references: [id_enrollement])
+  date_appoint   DateTime
+  shift          String    @default("morning")
+}
+
+////////////////////// Student /////////////////////////////////////////
+
+model Student {
+  id_student  Int       @id @default(autoincrement())
+  
+  parentId    Int?      
+  parent      Parent? @relation("student_parent", fields: [parentId], references: [id_parent])
+  
+  accountId   Int? @unique
+  account     CustomUser? @relation("student_account", fields: [accountId], references: [id])
+  
+  first_name  String?
+  last_name   String?
+  gender      String    @default("male")
+  
+  classeId    Int?
+  classe      Class?    @relation(fields: [classeId], references: [id_class])
+  
+  CNI         String
+  birth_date  DateTime?
+  
+  attendances         Attendance[] @relation("students_set")
+  examResults         ExamResult[]
+  examResultDetails   ExamResultDetails[]
+  assignmentResults   AssignmentResult[]
+  assignmentSubmissions AssignmentSubmission[]
+  monthlyFeeDetails   MonthlyFeeDetails[]
+  enrollementFeeDetails EnrollementFeeDetails[]
+}
+
+////////////////////// PARENT /////////////////////////////////////////
+
+model Parent {
+  id_parent Int       @id @default(autoincrement())
+  
+  userId    Int?
+  user      CustomUser? @relation(fields: [userId], references: [id])
+  children  Student[] @relation("student_parent")
+}
+
+//////////////////////// ADMIN //////////////////////////////////////////
+
+model Admin {
+  id_admin Int         @id @default(autoincrement())
+  userId   Int?
+  user     CustomUser? @relation(fields: [userId], references: [id])
+}
+
+////////////////////// TEACHER /////////////////////////////////////////
+
+model Teacher {
+  id_teacher Int       @id @default(autoincrement())
+  
+  userId     Int?      
+  user       CustomUser? @relation(fields: [userId], references: [id])
+  
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  subjects           Subject[]
+  supervisedClasses  Class[]   @relation("TeacherSupervision")
+  
+  birth_date DateTime?
+  department String?
+  bio        String?
+  hire_date  DateTime?
+  
+  // Relations ManyToMany avec Subject, Lesson, Class peuvent être ajoutées plus tard
+}
+
+////////////////////// Subject /////////////////////////////////////////
+
+model Subject {
+  id_subject                   Int      @id @default(autoincrement())
+  name                         String
+  description                  String?
+  coefficient                  Int      @default(1)
+  score_scale                   Int?
+  secondary_note               Int      @default(0)
+  secondary_note_percent       Float    @default(0)
+  secondary_note_selection     Int      @default(0)
+  
+  teacherId                    Int?
+  teacher                      Teacher? @relation(fields: [teacherId], references: [id_teacher])
+  
+  classeId                     Int?
+  classe                       Class?   @relation(fields: [classeId], references: [id_class])
+
+  lessons                      Lesson[]
+  schedules                    Schedule[]
+  assignments                  Assignment[]
+  examResultDetails            ExamResultDetails[]
+  assignmentStats              AssignmentStatis[]
+  
+  // lessons ManyToMany peuvent être ajoutées plus tard
+}
+
+////////////////////// LESSON /////////////////////////////////////////
+
+model Lesson {
+  id_lesson   Int      @id @default(autoincrement())
+  name        String
+  day         String?
+  startTime   DateTime?
+  endTime     DateTime?
+
+  subjectId   Int?
+  subject     Subject? @relation(fields: [subjectId], references: [id_subject])
+
+  attendances Attendance[] @relation("lessons_set")
+  assignments Assignment[] @relation("assignments_set")
+  // exams, teacher, classe, assignments ManyToMany peuvent être ajoutés plus tard
+}
+
+////////////////////// Schedule /////////////////////////////////////////
+
+model Schedule {
+  id_schedule   Int       @id @default(autoincrement())
+  day_of_week   String?
+  date          DateTime?
+  start_time    DateTime?
+  end_time      DateTime?
+
+  subjectId     Int?
+  subject       Subject?  @relation(fields: [subjectId], references: [id_subject])
+
+  classeId      Int?
+  classe        Class?    @relation(fields: [classeId], references: [id_class])
+
+  assignments   Assignment[] @relation("schedules_set")
+  attendances   Attendance[]
+}
+
+////////////////////// Attendance /////////////////////////////////////////
+
+model Attendance {
+  id_attendance Int       @id @default(autoincrement())
+  
+  scheduleId    Int?
+  schedule      Schedule? @relation(fields: [scheduleId], references: [id_schedule])
+  
+  studentId     Int?
+  student       Student?  @relation("students_set", fields: [studentId], references: [id_student])
+  
+  created_at    DateTime
+  status        String    @default("present")
+
+  // Relations ManyToMany
+  lessons       Lesson[]  @relation("lessons_set")
+
+  @@unique([scheduleId, studentId, created_at])
+}
+
+////////////////////// Exam /////////////////////////////////////////
+
+model Exam {
+  id_exam            Int       @id @default(autoincrement())
+  title              String
+  start_date         DateTime?
+  end_date           DateTime?
+  exam_type          String?
+  school_years       String?
+  status             String?   @default("coming")
+  collected_outcomes Float     @default(0)
+  reported_at        DateTime?
+
+  // ManyToMany avec Class
+  classes            Class[]   @relation("classes_set")
+  examResults        ExamResult[]
+  examResultDetails  ExamResultDetails[]
+  examStats          ExamStatis[]
+  assignmentStats    AssignmentStatis[]
+  assignments        Assignment[]
+}
+
+////////////////////// Exam Result /////////////////////////////////////////
+
+model ExamResult {
+  id_exam_result Int       @id @default(autoincrement())
+  
+  examId         Int?
+  exam           Exam?     @relation(fields: [examId], references: [id_exam])
+  
+  studentId      Int?
+  student        Student?  @relation(fields: [studentId], references: [id_student])
+  
+  note           Float?
+  rank           Int?
+  mention        String?
+  
+  classeId       Int?
+  classe         Class?    @relation(fields: [classeId], references: [id_class])
+  
+  report_file    String?
+  created_at     DateTime? @default(now())
+}
+
+////////////////////// ExamResultDetails /////////////////////////////////////////
+
+model ExamResultDetails {
+  id_result_dtls   Int       @id @default(autoincrement())
+  
+  examId           Int?
+  exam             Exam?     @relation(fields: [examId], references: [id_exam])
+  
+  studentId        Int?
+  student          Student?  @relation(fields: [studentId], references: [id_student])
+  
+  subjectId        Int?
+  subject          Subject?  @relation(fields: [subjectId], references: [id_subject])
+  
+  primary_score    Float?
+  secondary_score  Float?
+  final_score      Float?
+  coeff_final_score Float?
+  
+  appreciation     String?
+  created_at       DateTime? @default(now())
+}
+
+////////////////////// Exam Statistiques /////////////////////////////////////////
+
+model ExamStatis {
+  id_exam_sttq          Int      @id @default(autoincrement())
+  
+  examId                Int?
+  exam                  Exam?    @relation(fields: [examId], references: [id_exam])
+  
+  classeId              Int?
+  classe                Class?   @relation(fields: [classeId], references: [id_class])
+  
+  classe_size           Int?
+  best_note             Float?
+  min_note              Float?
+  avg_note              Float?
+  acceptable_score_percent Float?
+}
+
+////////////////////// ReportConfig /////////////////////////////////////////
+
+model ReportConfig {
+  id_report_config  Int      @id @default(autoincrement())
+  title             String?
+  style             String?
+  
+  classeId          Int?
+  classe            Class?   @relation(fields: [classeId], references: [id_class])
+}
+
+////////////////////// SCHOOL INFOS /////////////////////////////////////////
+
+model SchoolInfos {
+  id_school   Int      @id @default(autoincrement())
+  name        String?
+  address     String?
+  email       String?
+  phone       String?
+  logo        String?
+  created_at  DateTime @default(now())
+  site        String?
+}
+
+////////////////////// ASSIGNMENT /////////////////////////////////////////
+
+model Assignment {
+  id_assignment       Int        @id @default(autoincrement())
+
+  examId              Int?
+  exam                Exam?      @relation(fields: [examId], references: [id_exam])
+
+  asg_type            String?
+  
+  subjectId           Int?
+  subject             Subject?   @relation(fields: [subjectId], references: [id_subject])
+
+  startDate           DateTime?
+  dueDate             DateTime?
+  title               String?
+  description         String?
+  correction_status   String     @default("Waiting")
+
+  // ManyToMany avec Lesson
+  lessons             Lesson[]   @relation("assignments_set")
+  schedules           Schedule[] @relation("schedules_set")
+  results             AssignmentResult[]
+  submissions         AssignmentSubmission[]
+  
+  // classes ManyToMany peut être ajoutée plus tard
+}
+
+////////////////////// AssignmentResult /////////////////////////////////////////
+
+model AssignmentResult {
+  id_assign_result  Int        @id @default(autoincrement())
+
+  assignmentId      Int?
+  assignment        Assignment? @relation(fields: [assignmentId], references: [id_assignment])
+
+  studentId         Int?
+  student           Student?    @relation(fields: [studentId], references: [id_student])
+
+  score             Float?
+}
+
+////////////////////// AssignmentStatis /////////////////////////////////////////
+
+model AssignmentStatis {
+  id_assign_sttc  Int      @id @default(autoincrement())
+
+  examId          Int?
+  exam            Exam?    @relation(fields: [examId], references: [id_exam])
+
+  subjectId       Int?
+  subject         Subject? @relation(fields: [subjectId], references: [id_subject])
+
+  classeId        Int?
+  classe          Class?   @relation(fields: [classeId], references: [id_class])
+
+  max_score       Float?
+  min_score       Float?
+  avg_score       Float?
+  acceptable_score_percent Float?
+}
+
+////////////////////// Assignment SUBMISSION /////////////////////////////////////////
+
+model AssignmentSubmission {
+  id                  Int        @id @default(autoincrement())
+  assignmentId        Int?
+  assignment          Assignment? @relation(fields: [assignmentId], references: [id_assignment])
+  studentId           Int?
+  student             Student?    @relation(fields: [studentId], references: [id_student])
+  submission_date     DateTime    @default(now())
+  file                String
+}
+
+////////////////////// EVENT /////////////////////////////////////////
+
+model Event {
+  id_event            Int       @id @default(autoincrement())
+  title               String?
+  startTime           DateTime?
+  endTime             DateTime?
+  description         String?
+  location            String?
+  date_posted         DateTime? @default(now())
+  classes             Class[]   @relation("classes_events")
+}
+
+////////////////////// ANNOUNCEMENT /////////////////////////////////////////
+
+model Announcement {
+  id_announcement     Int       @id @default(autoincrement())
+  title               String
+  content             String
+  date_posted         DateTime  @default(now())
+  classes             Class[]   @relation("classes_announcements")
+}
+
+////////////////////// Grade /////////////////////////////////////////
+
+model Grade {
+  id_grade            Int       @id @default(autoincrement())
+  level               Int       @unique
+  enrollement_fee     Int       @default(5000)
+  monthly_fee         Int       @default(5000)
+
+  demanded_students   enrollement_student_info[]
+  classes             Class[]   @relation("GradeClasses")
+}
+
+////////////////////// CLASS /////////////////////////////////////////
+
+model Class {
+  id_class            Int       @id @default(autoincrement())
+  name                String?
+  capacity            Int?
+  annee_academique    String @default("2025-2026")
+  subjects            Subject[]
+  supervisorId        Int?
+  supervisor          Teacher?  @relation("TeacherSupervision", fields: [supervisorId], references: [id_teacher])
+  students            Student[]
+  events              Event[]   @relation("classes_events")
+  announcements       Announcement[] @relation("classes_announcements")
+  gradeId             Int?
+  grade               Grade?    @relation("GradeClasses", fields: [gradeId], references: [id_grade])
+
+  exams               Exam[] @relation("classes_set")
+  examResults         ExamResult[]
+  examStats           ExamStatis[]
+  reportConfigs       ReportConfig[]
+  assignmentStats     AssignmentStatis[]
+  schedules           Schedule[]
+  monthlyFeeStats     MonthlyFeeStats[]
+  monthlyFeeDetails   MonthlyFeeDetails[]
+}
+
+////////////////////// MESSAGE /////////////////////////////////////////
+
+model Message {
+  id                  Int       @id @default(autoincrement())
+  senderId            Int?
+  sender              CustomUser? @relation("sent_messages", fields: [senderId], references: [id])
+  recipientId         Int?
+  recipient           CustomUser? @relation("received_messages", fields: [recipientId], references: [id])
+  content             String
+  timestamp           DateTime    @default(now())
+}
+
+////////////////////// EnrollementFee /////////////////////////////////////////
+
+model EnrollementFee {
+  id_enrol_fee        Int       @id @default(autoincrement())
+  unit_price          Int
+  enrol_number        Int       @default(0)
+  school_years        String @default("2025-2026")
+  updated_at          DateTime  @default(now())
+}
+
+////////////////////// EnrollementFeeDetails /////////////////////////////////////////
+
+model EnrollementFeeDetails {
+  id_enrol_fdls       Int       @id @default(autoincrement())
+  name                String @default("Frais d'inscription")
+  studentId           Int?
+  student             Student?  @relation(fields: [studentId], references: [id_student])
+  student_enrol_infoId Int?
+  student_enrol_info  enrollement_student_info? @relation(fields: [student_enrol_infoId], references: [id_enrollement_student_info])
+  receiptId           Int?
+  receipt             Receipt?  @relation(fields: [receiptId], references: [id_receipt])
+  school_years        String @default("2025-2026")
+  updated_at          DateTime  @default(now())
+}
+
+////////////////////// MonthlyFeeParams /////////////////////////////////////////
+
+model MonthlyFeeParams {
+  id_mthl_fp          Int       @id @default(autoincrement())
+  name                String @default("Frais de scolarité mensuels")
+  unit_price          Int       @default(5000)
+  start_month         Int       @default(10)
+  end_month           Int       @default(6)
+  deadline            Int       @default(15)
+  start_year          Int       @default(2025)
+  school_years        String @default("2025-2026")
+  updated_at          DateTime  @default(now())
+}
+
+////////////////////// MonthlyFeeStats /////////////////////////////////////////
+
+model MonthlyFeeStats {
+  id_mthl_fs          Int       @id @default(autoincrement())
+  month               Int
+  classeId            Int?
+  classe              Class?    @relation(fields: [classeId], references: [id_class])
+  total_collected     Int       @default(0)
+  school_years        String @default("2025-2026")
+  updated_at          DateTime  @default(now())
+}
+
+////////////////////// Receipt /////////////////////////////////////////
+
+model Receipt {
+  id_receipt          Int       @id @default(autoincrement())
+  reference           String
+  total_amount        Int       @default(0)
+  school_years        String @default("2025-2026")
+  created_at          DateTime  @default(now())
+  feeDetails          EnrollementFeeDetails[]
+  monthlyFeeDetails   MonthlyFeeDetails[]
+}
+
+////////////////////// MonthlyFeeDetails /////////////////////////////////////////
+
+model MonthlyFeeDetails {
+  id_mthl_fd          Int       @id @default(autoincrement())
+  month               String
+  studentId           Int?
+  student             Student?  @relation(fields: [studentId], references: [id_student])
+  classeId            Int?
+  classe              Class?    @relation(fields: [classeId], references: [id_class])
+  receiptId           Int?
+  receipt             Receipt?  @relation(fields: [receiptId], references: [id_receipt])
+  school_years        String @default("2025-2026")
+  updated_at          DateTime  @default(now())
+}

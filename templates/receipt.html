@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Reçu de {{ student.firstname }}</title>
+    <style>
+      body {
+        font-family: "Times New Roman", Times, serif;
+        font-size: 14px;
+        margin: 30px;
+      }
+
+      .header-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+      }
+
+      .student-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid #000;
+        margin-bottom: 20px;
+
+      }
+
+      .student-table tr, 
+      .student-table td {
+        padding: 10px;
+
+      }
+
+      .summary-table {
+        padding-top: 5px;
+      }
+
+      .header-table td {
+        vertical-align: top;
+        padding: 5px;
+      }
+
+      .header-title-table {
+        margin-bottom: 20px;
+      }
+
+      table.header-title-table tr, 
+      table.header-title-table td{
+        border: 1px solid #000;
+        padding: 10px;
+      }
+      
+      .header-title {
+        color:#ffffff;
+        background-color: #534e4e;
+        text-align: center;
+        font-family: cursive;
+        font-size: 20px;
+        font-weight: bold;
+        padding: 10px;
+        
+      }
+
+      .header-ref {
+        background-color: #ffffff;
+        text-align: center;
+        font-family: cursive;
+        font-size: 20px;
+        font-weight: bold;
+        padding: 10px;
+        
+      }
+
+      .section-title {
+        font-weight: bold;
+        background-color: #f0f0f0;
+        padding: 5px;
+        margin-top: 10px;
+      }
+
+      table.payements {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+
+      table.payements th,
+      table.payements td {
+        border: 1px solid #000;
+        padding: 10px;
+        text-align: center;
+      }
+
+      table.payements th,
+      table.summary-table tr {
+        background-color: #e0e0e0;
+      }
+
+      .totals-row td {
+        font-weight: bold;
+        background-color: #f9f9f9;
+      }
+
+      .signature {
+        text-align: left;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Header section -->
+    <table class="header-table">
+      <tr>
+        <td>
+          <strong>{{ school.name }}</strong><br />
+          Tél: {{ school.phone }}<br />
+          {{ school.address }}
+        </td>
+      </tr>
+    </table>
+
+    <!-- Title section -->
+    <table class="header-title-table">
+      <tr>
+        <td class="header-title">Reçu de Payement</td>
+        <td class="header-ref">Réf: {{ receipt.reference }}</td>
+      </tr>
+    </table>
+
+    <!-- Student info section -->
+    <table class="student-table">
+      <tr style="background-color: #f9f9f9; font-weight: bold;">
+        <td>ELEVE</td>
+        <td>TUTEUR</td>
+      </tr>
+      <tr>
+        <td>
+          <strong>Nom: </strong> {{ student.lastname }}<br />
+          <strong>Prénom: </strong> {{ student.firstname }}<br />
+          <strong>Matricule: </strong> {{ student.CNI }} <br />
+          <strong>Classe: </strong> {{ student.classe.name }} <br />
+          <strong>Année scolaire: </strong> {{ receipt.school_years }} <br />
+        </td>
+        <td>
+          <strong>Nom: {{ parent.last_name }}</strong> <br />
+          <strong>Prénom: {{ parent.first_name }}</strong> <br />
+          <strong>Tél: {{ parent.tel }}</strong> <br />
+          <strong>Adresse: {{ parent.address }}</strong> <br />
+        </td>
+      </tr>
+    </table>
+
+    <!-- Table des payements -->
+    <table class="payements">
+      <thead>
+        <tr>
+          <th style="width: 10%">Dates</th>
+          <th style="width: 30%; text-align: left">Désignation</th>
+          <th style="width: 10%">Mois</th>
+          <th style="width: 20%">Montant</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="text-align: left">{{ receipt.created_at }}</td>
+          <td>{{ receipt_details.name }}</td>
+          <td>{{ receipt_details.month }}</td>
+          <td>{{ receipt.total_amount }}</td>
+        </tr>
+        <tr class="totals-row">
+          <td colspan="3">MONTANT TOTAL</td>
+          <td>{{ receipt.total_amount }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Signature -->
+    <div class="signature">
+      <strong>Signature du Directeur:</strong>
+    </div>
+  </body>
+</html>

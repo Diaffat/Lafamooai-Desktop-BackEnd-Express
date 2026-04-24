@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Bulletin de {{ student.first_name }}</title>
+    <style>
+      body {
+        font-family: "Times New Roman", Times, serif;
+        font-size: 14px;
+        margin: 10px;
+      }
+
+      .header-table,
+      .student-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 30px;
+      }
+
+      .summary-table {
+        padding-top: 5px;
+      }
+
+      .header-table td {
+        vertical-align: top;
+        padding: 5px;
+      }
+
+      .header-title-table {
+        margin-bottom: 30px;
+      }
+
+      .header-title {
+        text-align: center;
+        font-family: cursive;
+        font-size: 20px;
+        font-weight: bold;
+        padding-top: 7px;
+        background-color: #f2f2f2;
+      }
+
+      .section-title {
+        font-weight: bold;
+        background-color: #f0f0f0;
+        padding: 5px;
+        margin-top: 10px;
+      }
+
+      table.notes {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        margin-bottom: 20px;
+
+      }
+
+      table.notes th,
+      table.notes td {
+        border: 1px solid #000;
+        padding: 7px;
+        text-align: center;
+      }
+
+      table.notes th,
+      table.summary-table tr {
+        background-color: #e0e0e0;
+      }
+
+      .totals-row td {
+        font-weight: bold;
+        background-color: #f9f9f9;
+      }
+
+      .signature {
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Header section -->
+    <table class="header-table">
+      <tr>
+        <td>
+          <strong>{{ school.name }}</strong><br />
+          Tél: {{ school.phone }}<br />
+          {{ school.address }}
+        </td>
+      </tr>
+    </table>
+
+    <!-- Title section -->
+    <table class="header-title-table">
+      <tr>
+        <td class="header-title">Bulletin de Notes</td>
+      </tr>
+    </table>
+
+    <!-- Student info section -->
+    <table class="student-table">
+      <tr>
+        <td style="width: 15%"></td>
+        <td>
+          <strong>Nom :</strong> {{ student.last_name }}<br />
+          <strong>Prénom :</strong> {{ student.first_name }}<br />
+          <strong>Matricule :</strong> {{ student.CNI }}
+        </td>
+        <td>
+          <strong>Période :</strong> {{ exam.title }}<br />
+          <strong>Année scolaire :</strong> {{ exam.school_years }}<br />
+          <strong>Classe :</strong> {{ student.classe }}
+        </td>
+        <td style="width: 15%"></td>
+      </tr>
+    </table>
+
+    <!-- Table des notes -->
+    <table class="notes">
+      <thead>
+        <tr>
+          <th style="width: 25%; text-align: left">Matières</th>
+          <th style="width: 15%">Note de Classe </th>
+          <th style="width: 15%"> % Note de Classe</th>
+          <th style="width: 15%">Note de composition</th>
+          <th style="width: 10%">Coeff.</th>
+          <th style="width: 10%">Moyenne</th>
+          <th style="width: 10%">Moy. coeff.</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for result in exam_details %}
+        <tr>
+          <td style="text-align: left">{{ result.subject.name }}</td>
+          <td>{{ result.secondary_score }}</td>
+          <td>{{ result.subject.secondary_note_percent}}%</td>
+          <td>{{ result.primary_score }}</td>
+          <td>{{ result.subject.coefficient }}</td>
+          <td>{{ result.final_score }}</td>
+          <td>{{ result.coeff_final_score }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="totals-row">
+          <td colspan="4">TOTAL</td>
+          <td>{{ coeff_total }}</td>
+          <td>{{ note_total }}</td>
+          <td>{{ note_coeff_total }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Résumé élève  -->
+    <table class="summary-table">
+      <tr>
+        <td>Moyenne Générale :<strong> {{ exam_result.note }}</strong></td>
+        <td>Mention :<strong> {{ exam_result.mention }}</strong></td>
+        <td>
+          Rang :<strong> {{ exam_result.rank }}e sur {{ exam_statis.classe_size }} </strong>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Résumé classe -->
+    <table>
+      <tr>
+        <td style="width: 67%;"></td>
+        <td>
+          <strong>Moy. 1er :</strong> {{ exam_statis.best_note }} <br />
+          <strong>Moy. classe :</strong> {{ exam_statis.avg_note }}
+        </td>
+      </tr>
+    </table>
+
+    <!-- Signature -->
+    <div class="signature">
+      <strong>Signature du Directeur:</strong>
+    </div>
+  </body>
+</html>
