@@ -540,4 +540,6 @@ module.exports = {
   deleteEnrollment,
   accept,
   getStats,
+  generatePassword,
+  generateUsername
 };

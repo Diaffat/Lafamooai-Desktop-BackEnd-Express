@@ -6,7 +6,9 @@ exports.serializeSubject = (subject) => {
     teacher: subject?.teacher ? {
       ...subject.teacher,
       id_teacher: subject.teacherId,
-      full_name: subject.teacher?.full_name ?? `${subject.teacher?.first_name ?? ''} ${subject.teacher?.last_name ?? ''}`.trim() || null,
+      full_name: subject.teacher?.full_name ??
+        `${subject.teacher?.user?.first_name ?? ''} ${subject.teacher?.user?.last_name ?? ''}`.trim()
+        ?? subject.teacher?.user?.username,
     } : null,
   };
 };

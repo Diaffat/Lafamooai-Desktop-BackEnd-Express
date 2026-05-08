@@ -1,15 +1,19 @@
-const prisma = require('../prisma');
+const prisma = require("../prisma");
+const fs = require("fs");
+const path = require("path");
+const handlebars = require("handlebars");
+const htmlPdf = require("html-pdf");
 const pageLimit = parseInt(process.env.pageLimit, 10);
 
 // Appreciation scale function
 const getAppreciation = (score) => {
-  if (score < 5) return 'Médiocre';
-  if (score >= 5 && score < 10) return 'Insuffisant';
-  if (score >= 10 && score < 12) return 'Passable';
-  if (score >= 12 && score < 14) return 'Assez bien';
-  if (score >= 14 && score < 16) return 'Bien';
-  if (score >= 16 && score < 18) return 'Très bien';
-  return 'Excellent';
+  if (score < 5) return "Médiocre";
+  if (score >= 5 && score < 10) return "Insuffisant";
+  if (score >= 10 && score < 12) return "Passable";
+  if (score >= 12 && score < 14) return "Assez bien";
+  if (score >= 14 && score < 16) return "Bien";
+  if (score >= 16 && score < 18) return "Très bien";
+  return "Excellent";
 };
 
 // Get all exam results with filtering and pagination
@@ -26,25 +30,25 @@ exports.getExamResults = async (req, res) => {
     if (search) {
       where.student = {
         account: {
-          username: { contains: search }
-        }
+          username: { contains: search },
+        },
       };
     }
 
     // Role-based filtering
-    if (user.role === 'student') {
+    if (user.role === "student") {
       const student = await prisma.student.findFirst({
-        where: { accountId: user.id }
+        where: { accountId: user.id },
       });
       if (student) {
         where.studentId = student.id_student;
       }
-    } else if (user.role === 'parent') {
+    } else if (user.role === "parent") {
       const students = await prisma.student.findMany({
-        where: { parent: { user: { id: user.id } } }
+        where: { parent: { user: { id: user.id } } },
       });
       if (students.length > 0) {
-        const studentIds = students.map(s => s.id_student);
+        const studentIds = students.map((s) => s.id_student);
         where.studentId = { in: studentIds };
       } else {
         where.id_exam_result = { in: [] };
@@ -55,15 +59,15 @@ exports.getExamResults = async (req, res) => {
     const results = await prisma.examResult.findMany({
       where,
       include: { student: true, exam: true },
-      orderBy: { exam: { end_date: 'desc' } },
+      orderBy: { exam: { end_date: "desc" } },
       skip: (page - 1) * limit,
-      take: limit
+      take: limit,
     });
 
     res.json({ count: total, results });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -72,22 +76,22 @@ exports.getExamResultById = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid exam result id' });
+      return res.status(400).json({ error: "Invalid exam result id" });
     }
 
     const result = await prisma.examResult.findUnique({
       where: { id_exam_result: id },
-      include: { student: true, exam: true, classe: true }
+      include: { student: true, exam: true, classe: true },
     });
 
     if (!result) {
-      return res.status(404).json({ error: 'Exam result not found' });
+      return res.status(404).json({ error: "Exam result not found" });
     }
 
     res.json(result);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -103,15 +107,15 @@ exports.createExamResult = async (req, res) => {
         note: parseFloat(note),
         rank: parseInt(rank, 10),
         mention,
-        classeId: parseInt(classeId, 10)
+        classeId: parseInt(classeId, 10),
       },
-      include: { student: true, exam: true }
+      include: { student: true, exam: true },
     });
 
     res.status(201).json(result);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -120,7 +124,7 @@ exports.updateExamResult = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid exam result id' });
+      return res.status(400).json({ error: "Invalid exam result id" });
     }
 
     const { note, rank, mention } = req.body;
@@ -130,15 +134,15 @@ exports.updateExamResult = async (req, res) => {
       data: {
         ...(note !== undefined && { note: parseFloat(note) }),
         ...(rank !== undefined && { rank: parseInt(rank, 10) }),
-        ...(mention && { mention })
+        ...(mention && { mention }),
       },
-      include: { student: true, exam: true }
+      include: { student: true, exam: true },
     });
 
     res.json(result);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -147,17 +151,17 @@ exports.deleteExamResult = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid exam result id' });
+      return res.status(400).json({ error: "Invalid exam result id" });
     }
 
     await prisma.examResult.delete({
-      where: { id_exam_result: id }
+      where: { id_exam_result: id },
     });
 
-    res.json({ message: 'Exam result deleted successfully' });
+    res.json({ message: "Exam result deleted successfully" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -167,29 +171,29 @@ exports.generateReports = async (req, res) => {
     const { exam_id } = req.body;
 
     if (!exam_id) {
-      return res.status(400).json({ error: 'exam_id is required' });
+      return res.status(400).json({ error: "exam_id is required" });
     }
 
     const exam = await prisma.exam.findUnique({
       where: { id_exam: parseInt(exam_id, 10) },
-      include: { classes: true }
+      include: { classes: true },
     });
 
     if (!exam) {
-      return res.status(404).json({ error: 'Exam not found' });
+      return res.status(404).json({ error: "Exam not found" });
     }
 
-    if (exam.status !== 'Corrected') {
-      return res.status(400).json({ error: 'Exam status must be Corrected' });
+    if (exam.status !== "Corrected") {
+      return res.status(400).json({ error: "Exam status must be Corrected" });
     }
 
     for (const clss of exam.classes) {
       const subjects = await prisma.subject.findMany({
-        where: { classeId: clss.id_class }
+        where: { classeId: clss.id_class },
       });
 
       const students = await prisma.student.findMany({
-        where: { classeId: clss.id_class }
+        where: { classeId: clss.id_class },
       });
 
       const studentNotes = [];
@@ -205,8 +209,8 @@ exports.generateReports = async (req, res) => {
             where: {
               examId: exam.id_exam,
               subjectId: sbj.id_subject,
-              asg_type: 'Primary_Note'
-            }
+              asg_type: "Primary_Note",
+            },
           });
 
           if (!pryAssgn) continue;
@@ -216,8 +220,8 @@ exports.generateReports = async (req, res) => {
           const pryAsgRslt = await prisma.assignmentResult.findFirst({
             where: {
               assignmentId: pryAssgn.id_assignment,
-              studentId: stdt.id_student
-            }
+              studentId: stdt.id_student,
+            },
           });
 
           const pryNote = pryAsgRslt?.score || 0;
@@ -233,8 +237,8 @@ exports.generateReports = async (req, res) => {
               where: {
                 examId: exam.id_exam,
                 subjectId: sbj.id_subject,
-                asg_type: 'Secondary_Note'
-              }
+                asg_type: "Secondary_Note",
+              },
             });
 
             const scdNotePrt = sbj.secondary_note_percent;
@@ -245,8 +249,8 @@ exports.generateReports = async (req, res) => {
               const scAsgRslt = await prisma.assignmentResult.findFirst({
                 where: {
                   assignmentId: scAsg.id_assignment,
-                  studentId: stdt.id_student
-                }
+                  studentId: stdt.id_student,
+                },
               });
               if (scAsgRslt) {
                 scdNotes.push(scAsgRslt.score);
@@ -256,14 +260,18 @@ exports.generateReports = async (req, res) => {
             let scdNotesAvg = 0;
             if (scdNotes.length > 0) {
               scdNotes.sort((a, b) => b - a);
-              const selectedNotes = scdNoteSlt !== 0 ? scdNotes.slice(0, scdNoteSlt) : scdNotes;
-              scdNotesAvg = selectedNotes.reduce((a, b) => a + b, 0) / selectedNotes.length;
+              const selectedNotes =
+                scdNoteSlt !== 0 ? scdNotes.slice(0, scdNoteSlt) : scdNotes;
+              scdNotesAvg =
+                selectedNotes.reduce((a, b) => a + b, 0) / selectedNotes.length;
             }
 
             const secondaryScore = Math.round(scdNotesAvg * 100) / 100;
-            const sbjNote = (1 - scdNotePrt) * pryNote + scdNotePrt * scdNotesAvg;
+            const sbjNote =
+              (1 - scdNotePrt) * pryNote + scdNotePrt * scdNotesAvg;
             const finalScore = Math.round(sbjNote * 100) / 100;
-            const coeffFinalScore = Math.round(sbjNote * sbj.coefficient * 100) / 100;
+            const coeffFinalScore =
+              Math.round(sbjNote * sbj.coefficient * 100) / 100;
 
             await prisma.examResultDetails.create({
               data: {
@@ -274,14 +282,15 @@ exports.generateReports = async (req, res) => {
                 secondary_score: secondaryScore,
                 final_score: finalScore,
                 coeff_final_score: coeffFinalScore,
-                appreciation: getAppreciation(finalScore)
-              }
+                appreciation: getAppreciation(finalScore),
+              },
             });
 
             stdtNotes.push(sbjNote * sbj.coefficient);
           } else {
             const finalScore = primaryScore;
-            const coeffFinalScore = Math.round(pryNote * sbj.coefficient * 100) / 100;
+            const coeffFinalScore =
+              Math.round(pryNote * sbj.coefficient * 100) / 100;
 
             await prisma.examResultDetails.create({
               data: {
@@ -291,8 +300,8 @@ exports.generateReports = async (req, res) => {
                 primary_score: primaryScore,
                 final_score: finalScore,
                 coeff_final_score: coeffFinalScore,
-                appreciation: getAppreciation(finalScore)
-              }
+                appreciation: getAppreciation(finalScore),
+              },
             });
 
             stdtNotes.push(pryNote * sbj.coefficient);
@@ -301,7 +310,9 @@ exports.generateReports = async (req, res) => {
 
         let examNote = 0;
         if (stdtNotes.length > 0 && sbjCoeffs.length > 0) {
-          examNote = stdtNotes.reduce((a, b) => a + b, 0) / sbjCoeffs.reduce((a, b) => a + b, 0);
+          examNote =
+            stdtNotes.reduce((a, b) => a + b, 0) /
+            sbjCoeffs.reduce((a, b) => a + b, 0);
         }
 
         studentNotes.push({ student: stdt, note: examNote });
@@ -324,15 +335,15 @@ exports.generateReports = async (req, res) => {
             note: Math.round(stdtNote.note * 100) / 100,
             rank,
             mention: getAppreciation(stdtNote.note),
-            classeId: clss.id_class
-          }
+            classeId: clss.id_class,
+          },
         });
       }
 
       for (const asgnId of Object.keys(primaryNotes)) {
         const assgn = await prisma.assignment.findUnique({
           where: { id_assignment: parseInt(asgnId, 10) },
-          include: { subject: true }
+          include: { subject: true },
         });
 
         if (assgn) {
@@ -340,7 +351,8 @@ exports.generateReports = async (req, res) => {
           const maxScore = Math.max(...notes);
           const minScore = Math.min(...notes);
           const avgScore = notes.reduce((a, b) => a + b, 0) / notes.length;
-          const acceptablePercent = (notes.filter(n => n >= 10).length / notes.length) * 100;
+          const acceptablePercent =
+            (notes.filter((n) => n >= 10).length / notes.length) * 100;
 
           await prisma.assignmentStatis.create({
             data: {
@@ -350,8 +362,9 @@ exports.generateReports = async (req, res) => {
               max_score: Math.round(maxScore * 100) / 100,
               min_score: Math.round(minScore * 100) / 100,
               avg_score: Math.round(avgScore * 100) / 100,
-              acceptable_score_percent: Math.round(acceptablePercent * 100) / 100
-            }
+              acceptable_score_percent:
+                Math.round(acceptablePercent * 100) / 100,
+            },
           });
         }
       }
@@ -364,9 +377,14 @@ exports.generateReports = async (req, res) => {
             classe_size: notesList.length,
             best_note: Math.round(Math.max(...notesList) * 100) / 100,
             min_note: Math.round(Math.min(...notesList) * 100) / 100,
-            avg_note: Math.round((notesList.reduce((a, b) => a + b, 0) / notesList.length) * 100) / 100,
-            acceptable_score_percent: Math.round((acceptableScoreNum / notesList.length) * 100 * 100) / 100
-          }
+            avg_note:
+              Math.round(
+                (notesList.reduce((a, b) => a + b, 0) / notesList.length) * 100,
+              ) / 100,
+            acceptable_score_percent:
+              Math.round((acceptableScoreNum / notesList.length) * 100 * 100) /
+              100,
+          },
         });
       }
     }
@@ -375,18 +393,18 @@ exports.generateReports = async (req, res) => {
     await prisma.exam.update({
       where: { id_exam: exam.id_exam },
       data: {
-        status: 'Reported',
-        reported_at: new Date()
-      }
+        status: "Reported",
+        reported_at: new Date(),
+      },
     });
 
     res.status(201).json({
-      message: 'All reports created successfully',
-      class_count: exam.classes.length
+      message: "All reports created successfully",
+      class_count: exam.classes.length,
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -397,102 +415,189 @@ exports.getReport = async (req, res) => {
     const studentId = parseInt(req.query.stdid, 10);
 
     if (Number.isNaN(examId) || Number.isNaN(studentId)) {
-      return res.status(400).json({ error: 'Invalid exam or student id' });
+      return res.status(400).json({ error: "Invalid exam or student id" });
     }
 
     const exam = await prisma.exam.findUnique({
-      where: { id_exam: examId }
+      where: { id_exam: examId },
     });
 
     const student = await prisma.student.findUnique({
-      where: { id_student: studentId }
+      where: { id_student: studentId },
     });
 
     if (!exam || !student) {
-      return res.status(404).json({ error: 'Exam or student not found' });
+      return res.status(404).json({ error: "Exam or student not found" });
     }
 
     const notes = await prisma.examResultDetails.findMany({
       where: { examId, studentId },
-      include: { subject: true }
+      include: { subject: true },
     });
 
     const results = await prisma.examResult.findFirst({
-      where: { examId, studentId }
+      where: { examId, studentId },
     });
 
     const examStatis = await prisma.examStatis.findFirst({
-      where: { examId, classeId: student.classeId }
+      where: { examId, classeId: student.classeId },
     });
 
     res.json({
-      Message: 'Report details',
+      Message: "Report details",
       Notes: notes,
       Results: results,
-      Statistics: examStatis
+      Statistics: examStatis,
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
-// Download report as PDF (placeholder - requires pdf library)
+// Download report as PDF using the report.html template
 exports.reportPdfDownloader = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid exam result id' });
+      return res.status(400).json({ error: "Invalid exam result id" });
     }
 
     const examResult = await prisma.examResult.findUnique({
       where: { id_exam_result: id },
       include: {
         student: { include: { classe: true } },
-        exam: true
-      }
+        exam: true,
+      },
     });
 
     if (!examResult) {
-      return res.status(404).json({ error: 'Exam result not found' });
+      return res.status(404).json({ error: "Exam result not found" });
     }
 
     const examDetails = await prisma.examResultDetails.findMany({
       where: { examId: examResult.examId, studentId: examResult.studentId },
-      include: { subject: true }
+      include: { subject: true },
     });
 
     const school = await prisma.schoolInfos.findFirst();
+    const examStatis = await prisma.examStatis.findFirst({
+      where: {
+        examId: examResult.examId,
+        classeId: examResult.student.classeId,
+      },
+    });
 
-    // Calculate totals
     let noteTotal = 0;
     let coeffTotal = 0;
     let noteCoeffTotal = 0;
 
-    for (const detail of examDetails) {
+    const details = examDetails.map((detail) => {
       noteTotal += detail.final_score || 0;
       coeffTotal += detail.subject?.coefficient || 0;
       noteCoeffTotal += detail.coeff_final_score || 0;
+
+      return {
+        subject: {
+          name: detail.subject?.name || "",
+          coefficient: detail.subject?.coefficient || 0,
+          secondary_note_percent: detail.subject?.secondary_note_percent || 0,
+        },
+        secondary_score: detail.secondary_score ?? 0,
+        primary_score: detail.primary_score ?? 0,
+        final_score: detail.final_score ?? 0,
+        coeff_final_score: detail.coeff_final_score ?? 0,
+      };
+    });
+
+    const templatePath = path.join(__dirname, "..", "templates", "report.html");
+    const templateSource = fs.readFileSync(templatePath).toString();
+    // const templateSource = fs.readFileSync(templatePath, "utf8");
+    const template = handlebars.compile(templateSource);
+
+    const html = template({
+      school: {
+        name: school?.name || "",
+        phone: school?.phone || "",
+        address: school?.address || "",
+      },
+      student: {
+        first_name: examResult.student.first_name || "",
+        last_name: examResult.student.last_name || "",
+        CNI: examResult.student.CNI || examResult.student.cni || "",
+        classe: examResult.student.classe?.name || "",
+      },
+      exam: {
+        title: examResult.exam.title || "",
+        school_years: examResult.exam.school_years || "",
+      },
+      exam_result: {
+        note: examResult.note ?? 0,
+        mention: examResult.mention || "",
+        rank: examResult.rank ?? 0,
+      },
+      exam_details: details,
+      coeff_total: coeffTotal,
+      note_total: noteTotal,
+      note_coeff_total: noteCoeffTotal,
+      exam_statis: {
+        classe_size: examStatis?.classe_size ?? 0,
+        best_note: examStatis?.best_note ?? 0,
+        avg_note: examStatis?.avg_note ?? 0,
+      },
+    });
+
+    console.log("REPORT DEBUG", {
+      examResultExists: !!examResult,
+      examDetailsLength: details.length,
+      examStatisExists: !!examStatis,
+      htmlStartsWith: html.slice(0, 200),
+    });
+
+    if (req.query.debug === "true") {
+      return res.type("html").send(html);
     }
 
-    // TODO: Implement PDF generation with a library like 'pdfkit' or 'html2pdf'
-    // For now, returning JSON with report data
-
-    res.json({
-      message: 'Report PDF data (PDF generation requires pdf library setup)',
-      report_data: {
-        school,
-        exam: examResult.exam,
-        student: examResult.student,
-        exam_result: examResult,
-        exam_details: examDetails,
-        note_total: Math.round(noteTotal * 100) / 100,
-        coeff_total: coeffTotal,
-        note_coeff_total: Math.round(noteCoeffTotal * 100) / 100
-      }
+    const puppeteer = require("puppeteer");
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
+
+    const page = await browser.newPage();
+
+    await page.setContent(html, {
+      waitUntil: "domcontentloaded",
+    });
+
+    await page.emulateMediaType("screen");
+
+    await page.screenshot({
+      path: "debug.png",
+      fullPage: true,
+    });
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: {
+        top: "10mm",
+        right: "10mm",
+        bottom: "10mm",
+        left: "10mm",
+      },
+    });
+
+    await browser.close();
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="bulletin_${examResult.student.first_name}_${examResult.student.last_name}.pdf"`,
+    );
+    res.send(pdfBuffer);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };

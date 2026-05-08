@@ -1,5 +1,6 @@
 const prisma = require('../prisma');
 const pageLimit = parseInt(process.env.pageLimit, 10);
+const { serializeSubject } = require('../serializers/subjectSerializer');
 
 // Get all subjects with filtering and pagination
 exports.getSubjects = async (req, res) => {
@@ -40,7 +41,9 @@ exports.getSubjects = async (req, res) => {
     const subjects = await prisma.subject.findMany({
       where,
       include: { 
-        teacher: true,
+        teacher:  {
+          include: { user: true } // 👈 IMPORTANT
+        },
         classe: true,
         lessons: true
       },
@@ -49,7 +52,7 @@ exports.getSubjects = async (req, res) => {
       take: limit
     });
 
-    res.json({ count: total, results: subjects });
+    res.json({ count: total, results: subjects.map(serializeSubject),});
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -67,7 +70,9 @@ exports.getSubjectById = async (req, res) => {
     const subject = await prisma.subject.findUnique({
       where: { id_subject: id },
       include: { 
-        teacher: true,
+        teacher:  {
+          include: { user: true } // 👈 IMPORTANT
+        },
         classe: true,
         lessons: true
       }
@@ -112,7 +117,9 @@ exports.createSubject = async (req, res) => {
         ...(teacherId && { teacherId: parseInt(teacherId, 10) })
       },
       include: { 
-        teacher: true,
+        teacher:  {
+          include: { user: true } // 👈 IMPORTANT
+        },
         classe: true
       }
     });
@@ -155,8 +162,8 @@ exports.registerNew = async (req, res) => {
     // Get teacher
     let teacherId = null;
     if (teacher_id) {
-      const parsedTeacherId = typeof teacher_id === 'object' 
-        ? teacher_id.id_teacher 
+      const parsedTeacherId = typeof teacher_id === 'object'
+        ? teacher_id.id_teacher ?? teacher_id.teacherId
         : parseInt(teacher_id, 10);
       
       const teacher = await prisma.teacher.findUnique({
@@ -182,7 +189,9 @@ exports.registerNew = async (req, res) => {
         ...(teacherId && { teacherId })
       },
       include: { 
-        teacher: true,
+        teacher:  {
+          include: { user: true } // 👈 IMPORTANT
+        },
         classe: true
       }
     });
@@ -229,7 +238,9 @@ exports.updateSubject = async (req, res) => {
         ...(teacherId && { teacherId: parseInt(teacherId, 10) })
       },
       include: { 
-        teacher: true,
+        teacher:  {
+          include: { user: true } // 👈 IMPORTANT
+        },
         classe: true
       }
     });
@@ -251,7 +262,9 @@ exports.customUpdate = async (req, res) => {
 
     const subject = await prisma.subject.findUnique({
       where: { id_subject: id },
-      include: { teacher: true }
+      include: { teacher: {
+        include: { user: true } // 👈 IMPORTANT
+      } }
     });
 
     if (!subject) {
@@ -290,10 +303,16 @@ exports.customUpdate = async (req, res) => {
     }
 
     // Update teacher if changed
-    if (req.body.teachers && req.body.teachers.length > 0) {
-      const newTeacherId = req.body.teachers[0].id_teacher;
-      if (subject.teacher && subject.teacher.id_teacher !== newTeacherId) {
-        updateData.teacherId = newTeacherId;
+    const newTeacherId = req.body.teachers?.length > 0
+      ? req.body.teachers[0]?.id_teacher
+      : req.body.teacherId ?? req.body.teacher_id;
+
+    if (newTeacherId) {
+      const parsedTeacherId = typeof newTeacherId === 'string'
+        ? parseInt(newTeacherId, 10)
+        : newTeacherId;
+      if (!subject.teacher || subject.teacher.id_teacher !== parsedTeacherId) {
+        updateData.teacherId = parsedTeacherId;
       }
     }
 
@@ -304,7 +323,9 @@ exports.customUpdate = async (req, res) => {
         where: { id_subject: id },
         data: updateData,
         include: { 
-          teacher: true,
+          teacher:  {
+            include: { user: true } // 👈 IMPORTANT
+          },
           classe: true
         }
       });

@@ -32,7 +32,7 @@ const handleFileUpload = (req, res, next) => {
   });
 };
 
-router.post("/", controller.createUser);
+router.post("/create_user", controller.createUser);
 router.get("/", controller.getUsers);
 router.get("/stats", controller.getStats);
 router.get("/admin_dash", controller.adminDash);

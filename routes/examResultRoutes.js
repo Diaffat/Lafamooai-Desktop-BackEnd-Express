@@ -13,7 +13,7 @@ router.get('/:id', auth, controller.getExamResultById);
 router.get('/report/details', auth, controller.getReport);
 
 // GET /exam-results/:id/pdf - Download report as PDF
-router.get('/:id/pdf', auth, controller.reportPdfDownloader);
+router.get('/:id/report_pdf_downloader', auth, controller.reportPdfDownloader);
 
 // POST /exam-results - Create exam result
 router.post('/', auth, controller.createExamResult);

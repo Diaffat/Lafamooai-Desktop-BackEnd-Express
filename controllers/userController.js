@@ -1,7 +1,9 @@
 // controllers/user.controller.js
 const prisma = require("../prisma");
-
-const BASE_URL = 'http://localhost:8000';
+const { BASE_URL } = process.env.BASE_URL;
+const { generatePassword } = require("./enrollementController");
+const { sendEmail } = require("../services/emailService");
+const bcrypt = require("bcrypt");
 
 // Utility function to build full image URL
 const buildImageUrl = (user) => {
@@ -93,11 +95,64 @@ const formatPrismaError = (err, res) => {
 
 exports.createUser = async (req, res) => {
   try {
-    const user = await prisma.customUser.create({
-      data: req.body,
+    const {
+      username,
+      email,
+      role,
+      firstName,
+      lastName,
+      tel,
+      address
+    } = req.body;
+
+    console.log("BODY RECEIVED:", req.body);
+
+    if (!["admin", "teacher"].includes(role)) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
+    if (!username || !email || !role) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const plainPassword = generatePassword();
+
+    const hashedPassword = await bcrypt.hash(plainPassword, 10);
+    const createdUser = await prisma.$transaction(async (tx) => {
+      const user = await tx.customUser.create({
+        data: {
+        ...req.body,
+        username,
+        email,
+        password: hashedPassword,
+        first_name: firstName || null,
+        last_name: lastName || null,
+        tel: tel || null,
+        address: address || null,
+        role,
+      },
+      });
+
+      if (role === "admin") {
+        await tx.admin.create({ data: { userId: user.id } })
+      }
+
+      if (role === "teacher") {
+        await tx.teacher.create({ data: { userId: user.id } })
+      }
+
+      return user;
     });
 
-    res.status(201).json(buildImageUrl(user));
+    await sendEmail({
+      to: email,
+      subject: "Votre compte Lafamooai",
+      text: `Bonjour,\n\nVotre compte a été créé.\n\nUsername: ${username}\nPassword: ${plainPassword}\n\nVeuillez changer votre mot de passe après connexion.`,
+    });
+
+    res.status(201).json({
+      message: "User created successfully",
+      user: createdUser,
+    });
 
   } catch (err) {
     formatPrismaError(err, res);

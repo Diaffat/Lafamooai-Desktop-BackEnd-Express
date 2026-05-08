@@ -51,4 +51,12 @@ const sendAccountsEmail = async (email, accounts) => {
   });
 };
 
-module.exports = { sendVerificationCode, sendAccountsEmail };
+const sendEmail = ({to, subject, text}) => {
+  return transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to,
+    subject,
+    text,
+  });
+};
+module.exports = { sendVerificationCode, sendAccountsEmail, sendEmail };

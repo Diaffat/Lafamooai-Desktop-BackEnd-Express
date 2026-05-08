@@ -73,7 +73,13 @@ exports.getExams = async (req, res) => {
       orderBy: { start_date: 'desc' },
       skip: (page - 1) * limit,
       take: limit
-    });
+    }).then(exams => exams.map(exam => ({
+      ...exam,
+      classes: exam.classes?.map((c) => ({
+        label: c.name,
+        id: c.id_class
+      })) || []
+    })));
 
     res.json({ count: total, results: exams });
   } catch (err) {
@@ -95,6 +101,13 @@ exports.getExamById = async (req, res) => {
       include: { classes: true }
     });
 
+    if (exam) {
+      exam.classes = exam.classes?.map((c) => ({
+        label: c.name,
+        id: c.id_class
+      })) || [];
+    }
+
     if (!exam) {
       return res.status(404).json({ error: 'Exam not found' });
     }
@@ -105,11 +118,16 @@ exports.getExamById = async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
-
+// Map class_ids for exams after update
+const mapExamResponse = (exam) => ({
+  ...exam,
+  class_ids: exam.classes?.map((c) => c.id_class) || []
+});
 // Create exam
 exports.createExam = async (req, res) => {
   try {
     const { title, start_date, end_date, exam_type, school_years, status } = req.body;
+    const classIds = req.body.classIds || req.body.classes || [];
 
     const exam = await prisma.exam.create({
       data: {
@@ -118,10 +136,22 @@ exports.createExam = async (req, res) => {
         end_date: end_date ? new Date(end_date) : null,
         exam_type,
         school_years,
-        status: status || 'coming'
+        status: status || 'coming',
+        ...(Array.isArray(classIds) && classIds.length > 0
+          ? {
+              classes: {
+                connect: classIds.map((id) => ({ id_class: parseInt(id, 10) }))
+              }
+            }
+          : {}),
       },
       include: { classes: true }
     });
+
+    exam.classes = exam.classes?.map((c) => ({
+      label: c.name,
+      id: c.id_class
+    })) || [];
 
     res.status(201).json(exam);
   } catch (err) {
@@ -139,6 +169,7 @@ exports.updateExam = async (req, res) => {
     }
 
     const { title, start_date, end_date, exam_type, school_years, status } = req.body;
+    const classIds = req.body.classIds || req.body.classes || [];
 
     const exam = await prisma.exam.update({
       where: { id_exam: id },
@@ -148,7 +179,10 @@ exports.updateExam = async (req, res) => {
         ...(end_date && { end_date: new Date(end_date) }),
         ...(exam_type && { exam_type }),
         ...(school_years && { school_years }),
-        ...(status && { status })
+        ...(status && { status }),
+        ...(Array.isArray(classIds) && classIds.length > 0
+          ? { classes: { set: classIds.map((id) => ({ id_class: parseInt(id, 10) })) } }
+          : {}),
       },
       include: { classes: true }
     });

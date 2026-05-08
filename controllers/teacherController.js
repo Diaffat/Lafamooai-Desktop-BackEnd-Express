@@ -1,23 +1,41 @@
 const pageLimit = parseInt(process.env.pageLimit, 10);
 const prisma = require("../prisma");
 
+
 exports.getTeachers = async (req, res) => {
   try {
     const search = req.query.search || "";
-    const page = parseInt(req.query.page, pageLimit) || 1;
-    const limit = parseInt(req.query.limit, pageLimit) || pageLimit;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || pageLimit;
 
     const teachers = await prisma.teacher.findMany({
       skip: (page - 1) * limit,
       take: limit,
+      distinct: ['id_teacher'],
       where: search
         ? {
             OR: [
-              { username: { contains: search, mode: "insensitive" } },
-              { email: { contains: search, mode: "insensitive" } },
-              { tel: { contains: search, mode: "insensitive" } },
-              { address: { contains: search, mode: "insensitive" } },
-
+              // Recherche dans les champs de CustomUser via la relation
+              {
+                user: {
+                  username: { contains: search, mode: "insensitive" },
+                },
+              },
+              {
+                user: {
+                  email: { contains: search, mode: "insensitive" },
+                },
+              },
+              {
+                user: {
+                  tel: { contains: search, mode: "insensitive" },
+                },
+              },
+              {
+                user: {
+                  address: { contains: search, mode: "insensitive" },
+                },
+              },
               // relations
               {
                 subjects: {
@@ -27,7 +45,7 @@ exports.getTeachers = async (req, res) => {
                 },
               },
               {
-                classes: {
+                supervisedClasses: {
                   some: {
                     name: { contains: search, mode: "insensitive" },
                   },
@@ -44,12 +62,8 @@ exports.getTeachers = async (req, res) => {
       },
     });
 
-    // équivalent distinct()
-    const uniqueTeachers = Array.from(
-      new Map(teachers.map(t => [t.id, t])).values()
-    );
-
-    res.json({ count: uniqueTeachers.length, results: uniqueTeachers });
+    // équivalent distinct() - maintenant géré par Prisma avec distinct: ['id_teacher']
+    res.json({ count: teachers.length, results: teachers });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
@@ -68,8 +82,8 @@ exports.getTeacherById = async (req, res) => {
       where: { id_teacher: id },
       include: {
         user: true,
-        subjects: true,
-        supervisedClasses: true
+        subjects: { include: { classe: true } },
+        supervisedClasses: true,
       }
     });
 

@@ -5,46 +5,76 @@ const pageLimit = parseInt(process.env.pageLimit, 10);
 exports.getStudents = async (req, res) => {
   try {
     const { search, gender } = req.query;
+
     const page = parseInt(req.query.page, pageLimit) || 1;
     const limit = parseInt(req.query.limit, pageLimit) || pageLimit;
 
     const where = {};
 
     if (search) {
-      where.account = {
-        OR: [
-          { username: { contains: search } },
-          { email: { contains: search } },
-          { tel: { contains: search } },
-          { address: { contains: search } },
-        ],
-      };
+      where.OR = [
+        {
+          account: {
+            is: {
+              username: { contains: search, mode: "insensitive" },
+            },
+          },
+        },
+        {
+          account: {
+            is: {
+              email: { contains: search, mode: "insensitive"},
+            },
+          },
+        },
+        {
+          account: {
+            is: {
+              tel: { contains: search, mode: "insensitive" },
+            },
+          },
+        },
+        {
+          account: {
+            is: {
+              address: { contains: search, mode: "insensitive" },
+            },
+          },
+        },
+        {
+          first_name: { contains: search, mode: "insensitive" },
+        },
+        {
+          last_name: { contains: search, mode: "insensitive" },
+        },
+      ];
     }
 
     if (gender) {
       where.gender = gender;
     }
-
-    const students = await prisma.student.findMany({
-      where,
-      include: {
-        account: true,
-        parent: {
-          include: {
-            user: true,
+    
+    const [count, students] = await Promise.all([
+      prisma.student.count({ where }),   // 🔥 TOTAL RÉEL
+      prisma.student.findMany({
+        where,
+        include: {
+          account: true,
+          parent: {
+            include: { user: true },
           },
+          classe: true,
         },
-        classe: true,
-      },
-      orderBy: {
-        id_student: "asc",
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+        orderBy: {
+          id_student: "asc",
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
 
-    res.json({
-      count: students.length,
+    return res.json({
+      count: count,          // 🔥 total en DB
       results: students.map(serializeStudent),
     });
   } catch (err) {

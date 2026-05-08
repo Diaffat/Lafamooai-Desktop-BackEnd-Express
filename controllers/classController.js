@@ -1,4 +1,5 @@
 const prisma = require('../prisma');
+const { serializeSubject } = require('../serializers/subjectSerializer');
 
 const pageLimit = parseInt(process.env.pageLimit, 10);
 
@@ -28,7 +29,7 @@ exports.getClasses = async (req, res) => {
             account: true,
           },
         },
-        subjects: true,
+        subjects: { include: { teacher: { include: { user: true } } } },
       },
       orderBy: { id_class: 'asc' },
       skip: (page - 1) * limit,
@@ -40,6 +41,7 @@ exports.getClasses = async (req, res) => {
       grade: classe.gradeId ?? null,
       class_name: classe.name,
       effective: classe.students?.length ?? 0,
+      subjects: classe.subjects?.map(serializeSubject) || [],
     }));
 
     res.json({ count: total, results });
@@ -70,7 +72,7 @@ exports.getClassById = async (req, res) => {
             account: true,
           },
         },
-        subjects: true,
+        subjects: { include: { teacher: { include: { user: true } } } },
       },
     });
 
@@ -83,7 +85,7 @@ exports.getClassById = async (req, res) => {
       grade: classe.gradeId ?? null,
       class_name: classe.name,
       effective: classe.students?.length ?? 0,
-      subjects: classe.subjects ?? [],
+      subjects: classe.subjects?.map(serializeSubject) || [],
     });
   } catch (err) {
     console.error(err);
