@@ -1,6 +1,6 @@
-const prisma = require('../prisma'); 
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+const prisma = require("../prisma");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const { sendVerificationCode } = require("../services/emailService");
 const { verifyCode } = require("../services/verificationService");
 const { createUserWithRole } = require("../services/authService");
@@ -11,10 +11,10 @@ const BASE_URL = process.env.BASE_URL;
 
 // Utility function to build full image URL
 const buildImageUrl = (user) => {
-  if (user && user.img && !user.img.startsWith('http')) {
+  if (user && user.img && !user.img.startsWith("http")) {
     return {
       ...user,
-      img: `${BASE_URL}/media/${user.img}`
+      img: `${BASE_URL}/media/${user.img}`,
     };
   }
   return user;
@@ -22,26 +22,43 @@ const buildImageUrl = (user) => {
 
 // ================== LOGIN ==================
 const login = async (req, res) => {
-  const { username, password } = req.body;
+  const loginInput = (req.body.username || req.body.email || "")
+    .toString()
+    .trim();
+  const { password } = req.body;
 
   try {
-    const user = await prisma.customUser.findUnique({
-      where: { username },
+    if (!loginInput || !password) {
+      return res
+        .status(401)
+        .json({
+          error: "Veuillez saisir votre identifiant et votre mot de passe.",
+        });
+    }
+
+    const user = await prisma.customUser.findFirst({
+      where: {
+        OR: [{ username: loginInput }, { email: loginInput }],
+      },
     });
 
     if (!user) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      return res
+        .status(401)
+        .json({ error: "Nom d'utilisateur/e-mail ou mot de passe incorrect." });
     }
 
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      return res
+        .status(401)
+        .json({ error: "Nom d'utilisateur/e-mail ou mot de passe incorrect." });
     }
 
     // Update last_login timestamp
     await prisma.customUser.update({
       where: { id: user.id },
-      data: { last_login: new Date() }
+      data: { last_login: new Date() },
     });
 
     const tokens = await generateTokens(user);
@@ -76,7 +93,6 @@ const login = async (req, res) => {
     }
 
     res.json(response);
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Server error" });
@@ -92,7 +108,6 @@ const requestVerification = async (req, res) => {
   const { email } = req.body;
 
   try {
-
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
     await prisma.verificationCode.deleteMany({
@@ -109,7 +124,6 @@ const requestVerification = async (req, res) => {
     await sendVerificationCode(email, code);
 
     res.json({ message: "Code envoyé" });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Erreur lors de l'envoi du code" });
@@ -179,7 +193,6 @@ const signup = async (req, res) => {
       userId: user.id,
       role: user.role,
     });
-
   } catch (error) {
     if (error.message === "INVALID_CODE") {
       return res.status(400).json({ error: "Code invalide" });
@@ -190,7 +203,9 @@ const signup = async (req, res) => {
     }
 
     console.error(error);
-    res.status(500).json({ error: "Server error" , errorMessage: error.message});
+    res
+      .status(500)
+      .json({ error: "Server error", errorMessage: error.message });
   }
 };
 
@@ -199,14 +214,12 @@ const generateTokens = async (user) => {
   const accessToken = jwt.sign(
     { userId: user.id, role: user.role },
     accessSECRET,
-    { expiresIn: "24h" }  // Augmenté pour développement
+    { expiresIn: "24h" }, // Augmenté pour développement
   );
 
-  const refreshToken = jwt.sign(
-    { userId: user.id },
-    refreshSECRET,
-    { expiresIn: "30d" }
-  );
+  const refreshToken = jwt.sign({ userId: user.id }, refreshSECRET, {
+    expiresIn: "30d",
+  });
 
   await prisma.refreshToken.create({
     data: {
@@ -245,7 +258,6 @@ const refresh = async (req, res) => {
     const tokens = await generateTokens(user);
 
     res.json(tokens);
-
   } catch (err) {
     res.status(401).json({ error: "Token expired" });
   }
@@ -264,20 +276,20 @@ const resetPassword = async (req, res) => {
   try {
     // Verify email exists
     const user = await prisma.customUser.findUnique({
-      where: { email }
+      where: { email },
     });
 
     if (!user) {
-      return res.status(400).json({ 
-        error: "Aucun utilisateur avec cet email." 
+      return res.status(400).json({
+        error: "Aucun utilisateur avec cet email.",
       });
     }
 
     // Generate reset token (valid for 1 hour)
     const resetToken = jwt.sign(
       { userId: user.id },
-      process.env.RESET_PASSWORD_SECRET || 'reset_secret',
-      { expiresIn: '1h' }
+      process.env.RESET_PASSWORD_SECRET || "reset_secret",
+      { expiresIn: "1h" },
     );
 
     // Store reset token in database
@@ -285,22 +297,21 @@ const resetPassword = async (req, res) => {
       data: {
         userId: user.id,
         token: resetToken,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000) // 1 hour
-      }
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+      },
     });
 
     // TODO: Send reset email with link containing token
     // const resetLink = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
     // await sendPasswordResetEmail(email, resetLink);
 
-    res.json({ 
-      message: "Un email de réinitialisation a été envoyé." 
+    res.json({
+      message: "Un email de réinitialisation a été envoyé.",
     });
-
   } catch (error) {
     console.error(error);
-    res.status(500).json({ 
-      error: "Échec de l'envoi de l'email." 
+    res.status(500).json({
+      error: "Échec de l'envoi de l'email.",
     });
   }
 };
@@ -314,23 +325,23 @@ const resetPasswordConfirm = async (req, res) => {
     let decoded;
     try {
       decoded = jwt.verify(
-        token, 
-        process.env.RESET_PASSWORD_SECRET || 'reset_secret'
+        token,
+        process.env.RESET_PASSWORD_SECRET || "reset_secret",
       );
     } catch (error) {
-      return res.status(400).json({ 
-        error: "Lien invalide ou expiré." 
+      return res.status(400).json({
+        error: "Lien invalide ou expiré.",
       });
     }
 
     // Check if reset token exists and not expired
     const resetRecord = await prisma.passwordReset.findUnique({
-      where: { token }
+      where: { token },
     });
 
     if (!resetRecord || resetRecord.expiresAt < new Date()) {
-      return res.status(400).json({ 
-        error: "Lien invalide ou expiré." 
+      return res.status(400).json({
+        error: "Lien invalide ou expiré.",
       });
     }
 
@@ -340,22 +351,21 @@ const resetPasswordConfirm = async (req, res) => {
     // Update user password
     await prisma.customUser.update({
       where: { id: decoded.userId },
-      data: { password: hashedPassword }
+      data: { password: hashedPassword },
     });
 
     // Delete used reset token
     await prisma.passwordReset.delete({
-      where: { token }
+      where: { token },
     });
 
-    res.json({ 
-      message: "Mot de passe réinitialisé avec succès." 
+    res.json({
+      message: "Mot de passe réinitialisé avec succès.",
     });
-
   } catch (error) {
     console.error(error);
-    res.status(500).json({ 
-      error: "Erreur lors de la réinitialisation du mot de passe." 
+    res.status(500).json({
+      error: "Erreur lors de la réinitialisation du mot de passe.",
     });
   }
 };
@@ -367,22 +377,22 @@ const changePassword = async (req, res) => {
 
   try {
     if (!userId) {
-      return res.status(401).json({ 
-        error: "Non authentifié" 
+      return res.status(401).json({
+        error: "Non authentifié",
       });
     }
 
     // Validate passwords match
     if (new_password !== confirm_password) {
-      return res.status(400).json({ 
-        error: "Les mots de passe ne correspondent pas." 
+      return res.status(400).json({
+        error: "Les mots de passe ne correspondent pas.",
       });
     }
 
     // Validate password length
     if (new_password.length < 8) {
-      return res.status(400).json({ 
-        error: "Le mot de passe doit contenir au moins 8 caractères." 
+      return res.status(400).json({
+        error: "Le mot de passe doit contenir au moins 8 caractères.",
       });
     }
 
@@ -392,17 +402,16 @@ const changePassword = async (req, res) => {
     // Update user password
     await prisma.customUser.update({
       where: { id: userId },
-      data: { password: hashedPassword }
+      data: { password: hashedPassword },
     });
 
-    res.json({ 
-      message: "Success" 
+    res.json({
+      message: "Success",
     });
-
   } catch (error) {
     console.error(error);
-    res.status(500).json({ 
-      error: "Erreur lors du changement de mot de passe." 
+    res.status(500).json({
+      error: "Erreur lors du changement de mot de passe.",
     });
   }
 };
@@ -440,5 +449,5 @@ module.exports = {
   resetPassword,
   resetPasswordConfirm,
   changePassword,
-  getMe
+  getMe,
 };
