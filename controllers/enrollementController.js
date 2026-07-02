@@ -2,15 +2,44 @@ const prisma = require("../prisma");
 const pageLimit = parseInt(process.env.pageLimit, 10);
 const crypto = require("crypto");
 
+const {
+  buildEnrollmentStatusFilter,
+  INSCRIBED_STATUSES,
+} = require("../utils/enrollmentStatus");
 const { createUserWithRole } = require("../services/authService");
 const { sendAccountsEmail } = require("../services/emailService");
 const { generateCNI } = require("../services/authService");
 
-const generateUsername = (base) =>
-  `${base}${crypto.randomInt(100, 999)}`;
+const generateUsername = (base) => `${base}${crypto.randomInt(100, 999)}`;
 
-const generatePassword = () =>
-  crypto.randomBytes(4).toString("hex");
+const generatePassword = () => crypto.randomBytes(4).toString("hex");
+
+const resolveDemandedClassLevelId = async (value, tx = prisma) => {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const parsedValue = parseInt(value, 10);
+  if (Number.isNaN(parsedValue)) {
+    return null;
+  }
+
+  const selectedClass = await tx.class.findUnique({
+    where: { id_class: parsedValue },
+    select: { gradeId: true },
+  });
+
+  if (selectedClass?.gradeId) {
+    return selectedClass.gradeId;
+  }
+
+  const grade = await tx.grade.findUnique({
+    where: { id_grade: parsedValue },
+    select: { id_grade: true },
+  });
+
+  return grade?.id_grade ?? null;
+};
 
 const parseIntOrDefault = (value, defaultValue) => {
   const parsed = parseInt(value, 10);
@@ -30,13 +59,7 @@ const getEnrollments = async (req, res) => {
     const page = parseIntOrDefault(req.query.page, 1);
     const limit = parseIntOrDefault(req.query.limit, pageLimit);
 
-    const where = {};
-
-    if (statusParam === "demande") {
-      where.status = { not: "Accepted" };
-    } else if (statusParam === "inscrit") {
-      where.status = "Accepted";
-    }
+    const where = buildEnrollmentStatusFilter(statusParam);
 
     if (search) {
       where.OR = [
@@ -55,11 +78,18 @@ const getEnrollments = async (req, res) => {
           students: {
             include: {
               demanded_class_level: true,
+              class: {
+                select: {
+                 // id_class: true,
+                  name: true,
+                },
+              },
               feeDetails: {
                 include: {
                   receipt: true, // 🔥 ICI
-                }},
-              supporting_documents: true
+                },
+              },
+              supporting_documents: true,
             },
           },
         },
@@ -68,8 +98,8 @@ const getEnrollments = async (req, res) => {
         take: limit,
       }),
     ]);
-    
-    return res.json({ count, results: enrollments});
+
+    return res.json({ count, results: enrollments });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Server error" });
@@ -112,7 +142,11 @@ const customCreate = async (req, res) => {
     const studentsData = req.body.students;
     const schoolYear = req.body.school_year || "2025-2026";
 
-    if (!tutorData || !Array.isArray(studentsData) || studentsData.length === 0) {
+    if (
+      !tutorData ||
+      !Array.isArray(studentsData) ||
+      studentsData.length === 0
+    ) {
       return res.status(400).json({ error: "Missing tutor or students data" });
     }
 
@@ -133,23 +167,27 @@ const customCreate = async (req, res) => {
         tutorId: tutor.id_enrollement_tutor_info,
         school_year: schoolYear,
         submission_date: new Date(),
-        status: "Submitted",
+        status: "Accepted",
       },
     });
 
+    const mappedStudentData = await Promise.all(
+      studentsData.map(async (s) => ({
+        enrollementId: enrollment.id_enrollement,
+        firstname: s.firstname,
+        lastname: s.lastname,
+        gender: s.gender || "masculin",
+        age: parseIntOrDefault(s.age, 0),
+        classId: s.classId ? parseInt(s.classId, 10) : null,
+        demanded_class_levelId: await resolveDemandedClassLevelId(
+          s.classId,
+        ),
+      })),
+    );
+
     await prisma.enrollement_student_info.createMany({
-        data: studentsData.map((s) => ({
-            enrollementId: enrollment.id_enrollement,
-            firstname: s.firstname,
-            lastname: s.lastname,
-            gender: s.gender || "masculin",
-            age: parseIntOrDefault(s.age, 0),
-            demanded_class_levelId: s.demanded_class_level
-            ? parseInt(s.demanded_class_level, 10)
-            : null,
-        })),
-        });
-    
+      data: mappedStudentData,
+    });
 
     const serialized = await prisma.enrollement.findUnique({
       where: { id_enrollement: enrollment.id_enrollement },
@@ -157,13 +195,18 @@ const customCreate = async (req, res) => {
         tutor: true,
         students: {
           include: {
+            class: {
+              select: { name: true },
+            },
             demanded_class_level: true,
           },
         },
       },
     });
 
-    return res.status(201).json({ message: "Enrôlement réussi", data: serialized });
+    return res
+      .status(201)
+      .json({ message: "Enrôlement réussi", data: serialized });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Server error" });
@@ -206,19 +249,27 @@ const customUpdate = async (req, res) => {
     });
 
     for (const studentRecord of studentsData) {
+      const resolvedDemandedClassLevelId = await resolveDemandedClassLevelId(
+        studentRecord.classId,
+      );
+
       const studentData = {
         firstname: studentRecord.firstname,
         lastname: studentRecord.lastname,
         gender: studentRecord.gender || "masculin",
         age: parseIntOrDefault(studentRecord.age, 0),
-        demanded_class_levelId: studentRecord.demanded_class_level
-          ? parseInt(studentRecord.demanded_class_level, 10)
-          : undefined,
+        classId: studentRecord.classId ? parseInt(studentRecord.classId, 10) : null,
+        demanded_class_levelId: resolvedDemandedClassLevelId ?? null,
       };
 
       if (studentRecord.id_enrollement_student_info) {
         await prisma.enrollement_student_info.update({
-          where: { id_enrollement_student_info: parseInt(studentRecord.id_enrollement_student_info, 10) },
+          where: {
+            id_enrollement_student_info: parseInt(
+              studentRecord.id_enrollement_student_info,
+              10,
+            ),
+          },
           data: studentData,
         });
       } else {
@@ -241,7 +292,9 @@ const customUpdate = async (req, res) => {
       },
     });
 
-    return res.status(200).json({ message: "Enrollement updated successfully", results: updated });
+    return res
+      .status(200)
+      .json({ message: "Enrollement updated successfully", results: updated });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Server error" });
@@ -302,7 +355,9 @@ const createAccountsForEnrollment = async (enrollementId, prismaClient) => {
     prismaClient: db,
   });
 
-  const parent = await db.parent.findFirst({ where: { userId: parentUser.id } });
+  const parent = await db.parent.findFirst({
+    where: { userId: parentUser.id },
+  });
   if (!parent) {
     throw new Error("Parent account creation failed");
   }
@@ -319,7 +374,9 @@ const createAccountsForEnrollment = async (enrollementId, prismaClient) => {
         })
       : null;
 
-    const accountAllowed = studentInfo.demanded_class_level && studentInfo.demanded_class_level.level > 0;
+    const accountAllowed =
+      studentInfo.demanded_class_level &&
+      studentInfo.demanded_class_level.level > 0;
     let studentUser = null;
     let accountCredentials = null;
 
@@ -337,7 +394,10 @@ const createAccountsForEnrollment = async (enrollementId, prismaClient) => {
         prismaClient: db,
       });
 
-      accountCredentials = { username: studentUsername, password: studentPassword };
+      accountCredentials = {
+        username: studentUsername,
+        password: studentPassword,
+      };
     }
 
     const existingStudent = studentUser
@@ -405,7 +465,10 @@ const accept = async (req, res) => {
       }
 
       // 🔥 création comptes
-      const createdAccounts = await createAccountsForEnrollment(enrollmentId, tx);
+      const createdAccounts = await createAccountsForEnrollment(
+        enrollmentId,
+        tx,
+      );
 
       if (!createdAccounts.students || !createdAccounts.parent) {
         throw new Error("Accounts creation failed");
@@ -474,7 +537,6 @@ const accept = async (req, res) => {
     return res.json({
       message: "Enrôlement accepté.",
     });
-
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: error.message });
@@ -483,25 +545,32 @@ const accept = async (req, res) => {
 
 const getStats = async (req, res) => {
   try {
+    const inscribedWhere = {
+      enrollement: { status: { in: INSCRIBED_STATUSES } },
+    };
+
     const demandes = await prisma.enrollement_student_info.count({
       where: { enrollement: { status: { not: "Accepted" } } },
     });
 
     const enrolled = await prisma.enrollement_student_info.count({
-      where: { enrollement: { status: "Accepted" } },
+      where: inscribedWhere,
     });
 
     const enrolled_boys = await prisma.enrollement_student_info.count({
-      where: { enrollement: { status: "Accepted" }, gender: "male" },
+      where: { ...inscribedWhere, gender: "male" },
     });
 
     const enrolled_girls = await prisma.enrollement_student_info.count({
-      where: { enrollement: { status: "Accepted" }, gender: "female" },
+      where: { ...inscribedWhere, gender: "female" },
     });
 
     const gradeCounts = await prisma.enrollement_student_info.groupBy({
       by: ["demanded_class_levelId"],
-      where: { enrollement: { status: "Accepted" }, demanded_class_levelId: { not: null } },
+      where: {
+        ...inscribedWhere,
+        demanded_class_levelId: { not: null },
+      },
       _count: { _all: true },
     });
 
@@ -511,12 +580,14 @@ const getStats = async (req, res) => {
     });
 
     const acceptedStudents = await prisma.enrollement_student_info.findMany({
-      where: { enrollement: { status: "Accepted" } },
+      where: inscribedWhere,
       include: { enrollement: true },
     });
 
     const growthMap = acceptedStudents.reduce((acc, student) => {
-      const date = student.enrollement?.submission_date?.toISOString().slice(0, 10) ?? "unknown";
+      const date =
+        student.enrollement?.submission_date?.toISOString().slice(0, 10) ??
+        "unknown";
       acc[date] = (acc[date] || 0) + 1;
       return acc;
     }, {});
@@ -525,7 +596,14 @@ const getStats = async (req, res) => {
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => (a.date > b.date ? 1 : -1));
 
-    return res.json({ demandes, enrolled, enrolled_boys, enrolled_girls, grade_stats, growth });
+    return res.json({
+      demandes,
+      enrolled,
+      enrolled_boys,
+      enrolled_girls,
+      grade_stats,
+      growth,
+    });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Server error" });
@@ -541,5 +619,5 @@ module.exports = {
   accept,
   getStats,
   generatePassword,
-  generateUsername
+  generateUsername,
 };

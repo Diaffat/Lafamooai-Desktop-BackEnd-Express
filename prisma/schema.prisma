@@ -136,7 +136,11 @@ model enrollement_student_info {
   gender                      String                @default("masculin")
   cni                         String                @default("-")
   demanded_class_levelId      Int?  
-  demanded_class_level        Grade?                @relation(fields: [demanded_class_levelId], references: [id_grade])                
+  demanded_class_level        Grade?                @relation(fields: [demanded_class_levelId], references: [id_grade])       
+
+  classId Int?
+  class Class? @relation("EnrollmentStudentClass", fields: [classId], references: [id_class])
+
   age                         Int
 
   supporting_documents        enrollement_supporting_dcuments[]
@@ -548,7 +552,7 @@ model Class {
   announcements       Announcement[] @relation("classes_announcements")
   gradeId             Int?
   grade               Grade?    @relation("GradeClasses", fields: [gradeId], references: [id_grade])
-
+  enrollmentStudents  enrollement_student_info[] @relation("EnrollmentStudentClass")
   exams               Exam[] @relation("classes_set")
   examResults         ExamResult[]
   examStats           ExamStatis[]
