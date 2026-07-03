@@ -1,0 +1,21 @@
+*   [33m332d134[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge branch 'main' of https://github.com/Diaffat/Lafamooai-Desktop-BackEnd-Express
+[31m|[m[32m\[m  
+[31m|[m *   [33mdf97bed[m Merge branch 'main' of https://github.com/Diaffat/Lafamooai-Desktop-BackEnd-Express
+[31m|[m [33m|[m[34m\[m  
+[31m|[m * [34m|[m [33ma2aac6c[m je modifie la logique metier
+* [34m|[m [34m|[m [33m56be102[m je modifie la logique metier, ok pour le moment
+* [34m|[m [34m|[m [33m2580b81[m Merge branch 'main' of https://github.com/Diaffat/Lafamooai-Desktop-BackEnd-Express
+[34m|[m [34m|[m[34m/[m  
+[34m|[m[34m/[m[34m|[m   
+* [34m|[m [33m2414262[m Resolve conflict in SQLite database
+[35m|[m[34m\[m[34m|[m 
+[35m|[m * [33m857f846[m je change la logique metier
+* [36m|[m [33m4f3ed52[m je modifie la logique metier
+[36m|[m[36m/[m  
+[36m|[m *   [33m6e9de64[m[33m ([m[1;35mrefs/stash[m[33m)[m On main: wip before pull
+[36m|[m[36m/[m[1;32m|[m[1;33m\[m  
+[36m|[m [1;32m|[m * [33me045c3d[m untracked files on main: 01588e8 une version a peu pres fonctionnelle, a tester maintenant
+[36m|[m * [33m843a10b[m index on main: 01588e8 une version a peu pres fonctionnelle, a tester maintenant
+[36m|[m[36m/[m  
+* [33m01588e8[m une version a peu pres fonctionnelle, a tester maintenant
+* [33ma0ac34d[m Initial commit - nouvelle version backend desktop lafamooai en express
