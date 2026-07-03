@@ -24,7 +24,7 @@ const generateReceiptReference = async (tx, code = "FIA") => {
 };
 
 // MAIN SERVICE
-const acceptEnrollmentService = async (enrollementId) => {
+const registerEnrollment = async (enrollementId) => {
   return await prisma.$transaction(async (tx) => {
     const enrollment = await tx.enrollement.findUnique({
       where: { id_enrollement: enrollementId },
@@ -45,7 +45,7 @@ const acceptEnrollmentService = async (enrollementId) => {
     const parentPassword = `${randomInt(1000, 9999)}`;
     const hashedParentPassword = await bcrypt.hash(parentPassword, 10);
 
-    const parentUser = await tx.user.create({
+    const parentUser = await tx.customUser.create({
       data: {
         username: parentUsername,
         email: tutor.email || `${parentUsername}@lafamooai.local`,
@@ -62,12 +62,9 @@ const acceptEnrollmentService = async (enrollementId) => {
     });
 
     let message = `
-Tuteur: ${tutor.firstname} ${tutor.lastname}
-Nom d'utilisateur: ${parentUsername}
-Mot de passe: ${parentPassword}
-
-
-`;
+      Tuteur: ${tutor.firstname} ${tutor.lastname}
+      Nom d'utilisateur: ${parentUsername}
+      Mot de passe: ${parentPassword}`;
 
     const studentResults = [];
 
@@ -95,7 +92,7 @@ Mot de passe: ${parentPassword}
         const password = `${randomInt(1000, 9999)}`;
         const hashed = await bcrypt.hash(password, 10);
 
-        studentUser = await tx.user.create({
+        studentUser = await tx.customUser.create({
           data: {
             username,
             email: `${username}@lafamooai.local`,
@@ -108,12 +105,9 @@ Mot de passe: ${parentPassword}
         credentials = { username, password };
 
         message += `
-Elève: ${studentInfo.firstname} ${studentInfo.lastname}
-Nom d'utilisateur: ${username}
-Mot de passe: ${password}
-
-
-`;
+          Elève: ${studentInfo.firstname} ${studentInfo.lastname}
+          Nom d'utilisateur: ${username}
+          Mot de passe: ${password}`;
       }
 
       // 👨‍🎓 CREATE STUDENT
@@ -131,10 +125,12 @@ Mot de passe: ${password}
 
       // pivot
       if (defaultClass) {
-        await tx.classStudent.create({
+        await tx.student.update({
+          where: {
+            id_student: student.id_student,
+          },
           data: {
-            classId: defaultClass.id_class,
-            studentId: student.id_student,
+            classeId: defaultClass.id_class,
           },
         });
       }
@@ -200,6 +196,6 @@ const sendAccountEmail = async (to, message) => {
 };
 
 module.exports = {
-  acceptEnrollmentService,
+  registerEnrollment,
   sendAccountEmail,
 };

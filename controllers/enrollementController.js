@@ -1,6 +1,7 @@
 const prisma = require("../prisma");
 const pageLimit = parseInt(process.env.pageLimit, 10);
 const crypto = require("crypto");
+const { registerEnrollment } = require("../services/enrollmentService");
 
 const {
   buildEnrollmentStatusFilter,
@@ -188,6 +189,8 @@ const customCreate = async (req, res) => {
     await prisma.enrollement_student_info.createMany({
       data: mappedStudentData,
     });
+
+    await registerEnrollment(enrollment.id_enrollement);
 
     const serialized = await prisma.enrollement.findUnique({
       where: { id_enrollement: enrollment.id_enrollement },
