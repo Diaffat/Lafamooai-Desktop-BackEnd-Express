@@ -46,53 +46,25 @@ const createStats = () => ({
 const getParams = async () => {
   const p = await prisma.monthlyFeeParams.findFirst();
 
-  const start = p?.start_month ?? 10;
-  const end = p?.end_month ?? 6;
-  const school_years = p?.school_years ?? '2025-2026';
-  const deadline = p?.deadline ?? 15;
-
-  const [y1, y2] = school_years.split('-');
-  const now = new Date();
-
-  const month = now.getMonth() + 1;
-  const year = String(now.getFullYear());
-
-  const passed = [];
-  const coming = [];
-
-  const push = (from, to, arr) => {
-    if (from <= to) {
-      for (let i = from; i <= to; i++) arr.push(i);
-    } else {
-      for (let i = from; i <= 12; i++) arr.push(i);
-      for (let i = 1; i <= to; i++) arr.push(i);
-    }
-  };
-
-  if (month >= start && year === y1) {
-    push(start, month, passed);
-    push(month + 1, end - 1, coming);
-  } else if (month < start && year === y2) {
-    push(start, 12, passed);
-    push(1, month, passed);
-    push(month + 1, end - 1, coming);
-  } else if (month < start) {
-    push(start, 12, coming);
-    push(1, end - 1, coming);
-  } else {
-    push(start, 12, passed);
-    push(1, end - 1, passed);
-  }
-
   return {
-    school_years,
-    start_month: start,
-    end_month: end,
-    actual_month: month,
-    passed_months: toStr(passed),
-    coming_months: toStr(coming),
-    deadline,
+    school_years: p?.school_years ?? "2026-2027",
+    start_month: p?.start_month ?? 9,
+    end_month: p?.end_month ?? 6,
+    deadline: p?.deadline ?? 15,
   };
+};
+const getSchoolDate = (month, schoolYears, startMonth) => {
+
+    const [startYear, endYear] =
+        schoolYears.split("-").map(Number);
+
+    return new Date(
+        month >= startMonth
+            ? startYear
+            : endYear,
+        month - 1,
+        1
+    );
 };
 
 /* =========================
@@ -130,25 +102,54 @@ const getScopedStudents = async (user, schoolYears) => {
 /* =========================
    PAYMENT STATUS (CENTRAL LOGIC)
 ========================= */
-const computeStatus = (params, fee, today) => {
-  const month = String(fee.month);
+const computeStatus = (params, fee, today = new Date()) => {
 
-  const isPaid = !!fee.receiptId;
-  const isPast = params.passed_months.includes(month);
-  const isComing = params.coming_months.includes(month);
-  const isCurrent = month === String(params.actual_month);
+    const feeDate = getSchoolDate(
+        Number(fee.month),
+        params.school_years,
+        params.start_month
+    );
 
-  if (isPaid && isComing) return 'in_advance';
-  if (isPaid) return 'at_day';
+    const currentMonth = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        1
+    );
 
-  if (!isPaid && isPast) return 'overdue';
+    const isPaid = !!fee.receiptId;
 
-  if (!isPaid && isCurrent && today.getDate() <= params.deadline)
-    return 'waiting';
+    let status;
 
-  if (!isPaid && isComing) return 'in_coming';
+    if (feeDate > currentMonth) {
 
-  return 'overdue';
+        status = isPaid
+            ? "in_advance"
+            : "in_coming";
+
+    } else if (feeDate.getTime() === currentMonth.getTime()) {
+
+        if (isPaid)
+            status = "at_day";
+
+        else if (today.getDate() <= params.deadline)
+            status = "waiting";
+
+        else
+            status = "overdue";
+
+    } else {
+
+        status = isPaid
+            ? "at_day"
+            : "overdue";
+    }
+
+    return {
+        status,
+        isCurrent:
+            feeDate.getTime() === currentMonth.getTime(),
+        isPaid
+    };
 };
 
 /* =========================
@@ -236,6 +237,7 @@ exports.payementInfos = async (req, res) => {
     const user = req.user;
     const params = await getParams();
     const today = new Date();
+    const actualMonth = today.getMonth() + 1;
 
     const students = await getScopedStudents(user, params.school_years);
     if (!students.length) return res.json({ results: [] });
@@ -266,11 +268,11 @@ exports.payementInfos = async (req, res) => {
       for (const f of studentFees) {
         if (!receipt && f.receiptId) receipt = f.receiptId;
 
-        const status = computeStatus(params, f, today);
+        const info = computeStatus(params, f, today);
 
-        if (status === 'in_advance') inAdvance.push(f.month);
-        if (status === 'overdue') overdue.push(f.month);
-        if (status === 'at_day' && Number(f.month) === params.actual_month)
+        if (info.status  === 'in_advance') inAdvance.push(f.month);
+        if (info.status === 'overdue') overdue.push(f.month);
+        if (info.status === 'at_day' && Number(f.month) === actualMonth)
           currentPaid = true;
       }
 
@@ -282,7 +284,7 @@ exports.payementInfos = async (req, res) => {
         months = inAdvance;
       } else if (currentPaid) {
         status = 'at_day';
-        months = [params.actual_month];
+        months = [actualMonth];
       } else if (overdue.length) {
         status = 'overdue';
         months = overdue;
@@ -470,6 +472,7 @@ exports.financialStats = async (req, res) => {
     }
 
     const studentMap = {};
+
     for (const s of students) {
       studentMap[s.id_student] = s;
     }
@@ -487,63 +490,63 @@ exports.financialStats = async (req, res) => {
     });
 
     const stats = createStats();
-    const actualMonth = String(params.actual_month);
+
+    const today = new Date();
 
     for (const fee of fees) {
-      const month = String(fee.month);
       const student = studentMap[fee.studentId];
       const price = student?.classe?.grade?.monthly_fee || 0;
 
-      const isPaid = !!fee.receiptId;
-      const isPast = params.passed_months.includes(month);
-      const isComing = params.coming_months.includes(month);
+      const info = computeStatus(params, fee, today);
 
-      // =====================
-      // TOTAL PAID
-      // =====================
-      if (isPaid) {
-        stats.total_paid_number++;
-        stats.total_paid_amount += price;
-      }
+      switch (info.status) {
 
-      // =====================
-      // OVERDUE
-      // =====================
-      if (!isPaid && isPast) {
-        stats.total_overdue_number++;
-        stats.total_overdue_amount += price;
-      }
+          case "at_day":
 
-      // =====================
-      // CURRENT MONTH
-      // =====================
-      if (month === actualMonth && isPaid) {
-        stats.paid_this_month_num++;
-        stats.paid_this_month_aut += price;
-      }
+              stats.total_paid_number++;
+              stats.total_paid_amount += price;
 
-      // =====================
-      // IN ADVANCE
-      // =====================
-      if (isPaid && isComing) {
-        stats.in_advance_amount += price;
+              if (info.isCurrent) {
+                  stats.paid_this_month_num++;
+                  stats.paid_this_month_aut += price;
+              }
+
+              break;
+
+          case "in_advance":
+
+              stats.total_paid_number++;
+              stats.total_paid_amount += price;
+              stats.in_advance_amount += price;
+
+              break;
+
+          case "waiting":
+
+              if (info.isCurrent) {
+                  stats.this_month_overdue_num++;
+                  stats.this_month_overdue_aut += price;
+              }
+
+              break;
+
+          case "overdue":
+
+              stats.total_overdue_number++;
+              stats.total_overdue_amount += price;
+
+              if (info.isCurrent) {
+                  stats.this_month_overdue_num++;
+                  stats.this_month_overdue_aut += price;
+              }
+
+              break;
       }
     }
 
-    // =====================
-    // OVERDUE THIS MONTH (SAFE FIX)
-    // =====================
-    stats.this_month_overdue_num =
-      Math.max(0, students.length - stats.paid_this_month_num);
-
-    const avgPrice =
-      students[0]?.classe?.grade?.monthly_fee || 0;
-
-    stats.this_month_overdue_aut =
-      stats.this_month_overdue_num * avgPrice;
-
-    return res.json({ results: [stats] });
-
+    return res.json({
+        results: [stats],
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });

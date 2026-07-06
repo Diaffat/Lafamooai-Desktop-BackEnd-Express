@@ -1,4 +1,5 @@
 const prisma = require("../prisma");
+const { generateSchoolMonths } = require("../utils/monthlyFeeUtils");
 const bcrypt = require("bcrypt");
 const nodemailer = require("nodemailer");
 
@@ -153,13 +154,22 @@ const registerEnrollment = async (enrollementId) => {
           },
         });
 
+        const monthlyParams = await tx.monthlyFeeParams.findFirst();
+
+        const schoolMonths = generateSchoolMonths(
+          monthlyParams.start_month,
+          monthlyParams.end_month
+        );
+
         // ⚡ BULK months
+
         await tx.monthlyFeeDetails.createMany({
-          data: Array.from({ length: 12 }, (_, i) => ({
-            month: String(i + 1),
+          data: schoolMonths.map((month) => ({
+            month: String(month),
             studentId: student.id_student,
             classeId: defaultClass.id_class,
-            receiptId: receipt.id_receipt,
+            receiptId: null,
+            school_years: monthlyParams.school_years,
           })),
         });
       }

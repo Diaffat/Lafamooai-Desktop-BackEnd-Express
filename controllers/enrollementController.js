@@ -568,19 +568,29 @@ const getStats = async (req, res) => {
       where: { ...inscribedWhere, gender: "female" },
     });
 
-    const gradeCounts = await prisma.enrollement_student_info.groupBy({
-      by: ["demanded_class_levelId"],
+    const students = await prisma.enrollement_student_info.findMany({
       where: {
         ...inscribedWhere,
-        demanded_class_levelId: { not: null },
+        classId: { not: null },
       },
-      _count: { _all: true },
+      include: {
+        class: {
+          select: {
+            name: true,
+          },
+        },
+      },
     });
 
     const grade_stats = {};
-    gradeCounts.forEach((item) => {
-      grade_stats[item.demanded_class_levelId] = item._count._all;
+
+    students.forEach((student) => {
+      const className = student.class?.name ?? "Sans classe";
+
+      grade_stats[className] = (grade_stats[className] || 0) + 1;
     });
+
+    console.log(grade_stats);
 
     const acceptedStudents = await prisma.enrollement_student_info.findMany({
       where: inscribedWhere,
