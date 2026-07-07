@@ -1,162 +1,13 @@
 const pageLimit = parseInt(process.env.pageLimit, 10);
-const jwt = require('jsonwebtoken');
 const prisma = require('../prisma');
 const { serializeStudent } = require('../serializers/studentSerializer');
-
-const accessSECRET = process.env.ACCESS_SECRET || 'MY_ACCESS_SECRET_KEY';
-
-/* =========================
-   AUTH
-========================= */
-const decodeUser = (req) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return null;
-
-  const token = authHeader.startsWith('Token ')
-    ? authHeader.slice(6)
-    : authHeader;
-
-  try {
-    return jwt.verify(token, accessSECRET);
-  } catch {
-    return null;
-  }
-};
-
-/* =========================
-   UTILS
-========================= */
-const toStr = (m) => m.map(String);
-
-const createStats = () => ({
-  total_paid_number: 0,
-  total_paid_amount: 0,
-  total_overdue_number: 0,
-  total_overdue_amount: 0,
-  paid_this_month_num: 0,
-  paid_this_month_aut: 0,
-  this_month_overdue_num: 0,
-  this_month_overdue_aut: 0,
-  in_advance_amount: 0,
-});
-
-/* =========================
-   PARAMS (Django style source of truth)
-========================= */
-const getParams = async () => {
-  const p = await prisma.monthlyFeeParams.findFirst();
-
-  return {
-    school_years: p?.school_years ?? "2026-2027",
-    start_month: p?.start_month ?? 9,
-    end_month: p?.end_month ?? 6,
-    deadline: p?.deadline ?? 15,
-  };
-};
-const getSchoolDate = (month, schoolYears, startMonth) => {
-
-    const [startYear, endYear] =
-        schoolYears.split("-").map(Number);
-
-    return new Date(
-        month >= startMonth
-            ? startYear
-            : endYear,
-        month - 1,
-        1
-    );
-};
-
-/* =========================
-   SCOPED STUDENTS
-========================= */
-const getScopedStudents = async (user, schoolYears) => {
-  if (!user) return [];
-
-  const include = {
-    account: true,
-    parent: true,
-    classe: { include: { grade: true } },
-  };
-
-  const base = { classe: { annee_academique: schoolYears } };
-
-  if (user.role === 'admin')
-    return prisma.student.findMany({ where: base, include });
-
-  if (user.role === 'parent')
-    return prisma.student.findMany({
-      where: { ...base, parent: { userId: user.userId } },
-      include,
-    });
-
-  if (user.role === 'student')
-    return prisma.student.findMany({
-      where: { ...base, accountId: user.userId },
-      include,
-    });
-
-  return [];
-};
-
-/* =========================
-   PAYMENT STATUS (CENTRAL LOGIC)
-========================= */
-const computeStatus = (params, fee, today = new Date()) => {
-
-    const feeDate = getSchoolDate(
-        Number(fee.month),
-        params.school_years,
-        params.start_month
-    );
-
-    const currentMonth = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        1
-    );
-
-    const isPaid = !!fee.receiptId;
-
-    let status;
-
-    if (feeDate > currentMonth) {
-
-        status = isPaid
-            ? "in_advance"
-            : "in_coming";
-
-    } else if (feeDate.getTime() === currentMonth.getTime()) {
-
-        if (isPaid)
-            status = "at_day";
-
-        else if (today.getDate() <= params.deadline)
-            status = "waiting";
-
-        else
-            status = "overdue";
-
-    } else {
-
-        status = isPaid
-            ? "at_day"
-            : "overdue";
-    }
-
-    return {
-        status,
-        isCurrent:
-            feeDate.getTime() === currentMonth.getTime(),
-        isPaid
-    };
-};
+const { createStats, getParams, getSchoolDate, getScopedStudents, enrichFee } = require('../utils/monthlyFeeDetailsUtils');
 
 /* =========================
    MONTHLY FEES LIST
 ========================= */
 exports.getMonthlyFeeDetails = async (req, res) => {
-  const user = decodeUser(req);
+  const user = req.user;
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   const search = req.query.search || '';
@@ -199,6 +50,11 @@ exports.getMonthlyFeeDetails = async (req, res) => {
    MONTHLY FEE DETAIL BY ID
 ========================= */
 exports.getMonthlyFeeDetailById = async (req, res) => {
+  const user = req.user;
+  if (!user) {
+      return res.status(401).json({ error: "Unauthorized" });
+  }
+  
   const id = parseInt(req.params.id, 10);
   if (Number.isNaN(id)) {
     return res.status(400).json({ error: 'Invalid monthly fee detail id' });
@@ -235,10 +91,12 @@ exports.getMonthlyFeeDetailById = async (req, res) => {
 exports.payementInfos = async (req, res) => {
   try {
     const user = req.user;
+    if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
     const params = await getParams();
     const today = new Date();
-    const actualMonth = today.getMonth() + 1;
-
+    
     const students = await getScopedStudents(user, params.school_years);
     if (!students.length) return res.json({ results: [] });
 
@@ -256,6 +114,7 @@ exports.payementInfos = async (req, res) => {
     });
 
     const results = [];
+    const actualMonth = today.getMonth() + 1;
 
     for (const s of students) {
       const studentFees = map[s.id_student] || [];
@@ -266,14 +125,20 @@ exports.payementInfos = async (req, res) => {
       let currentPaid = false;
 
       for (const f of studentFees) {
-        if (!receipt && f.receiptId) receipt = f.receiptId;
 
-        const info = computeStatus(params, f, today);
+        const fee = enrichFee(f, s, params, today);
 
-        if (info.status  === 'in_advance') inAdvance.push(f.month);
-        if (info.status === 'overdue') overdue.push(f.month);
-        if (info.status === 'at_day' && Number(f.month) === actualMonth)
-          currentPaid = true;
+        if (!receipt && fee.receiptId)
+            receipt = fee.receiptId;
+
+        if (fee.status === "in_advance")
+            inAdvance.push(fee.month);
+
+        if (fee.status === "overdue")
+            overdue.push(fee.month);
+
+        if (fee.isCurrent && fee.status === "at_day")
+            currentPaid = true;
       }
 
       let status = 'at_day';
@@ -308,9 +173,10 @@ exports.payementInfos = async (req, res) => {
 
 /* =========================
    MAKE PAYMENT
-========================= */
+============================ */
 exports.makePayement = async (req, res) => {
-  const user = decodeUser(req);
+  const user = req.user;
+
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   const id = parseInt(req.body.id_mthl_fd, 10);
@@ -319,35 +185,49 @@ exports.makePayement = async (req, res) => {
 
   try {
     const fee = await prisma.monthlyFeeDetails.findUnique({
-      where: { id_mthl_fd: id },
-      include: {
-        student: { include: { classe: { include: { grade: true } } } },
-      },
+        where: { id_mthl_fd: id },
+        include: {
+          student: { include: { classe: { include: { grade: true } } } },
+        },
+      });
+
+    if (!fee) {
+        return res.status(404).json({ error: 'Payment not found' });
+    }
+
+    if (fee.receiptId) {
+        return res.status(400).json({
+            error: "This monthly fee has already been paid.",
+        });
+    }
+    if (!fee.student?.classe?.grade) {
+        return res.status(500).json({
+          error: "Informations sur la classe ou le niveau de leleve manquant",
+        });
+      }
+
+    const result = await prisma.$transaction(async (tx) => {
+      
+
+      const amount = fee.student.classe.grade.monthly_fee;
+      
+      const receipt = await createReceipt(tx, amount);
+
+      await tx.monthlyFeeDetails.update({
+        where: { id_mthl_fd: fee.id_mthl_fd },
+        data: { receiptId: receipt.id_receipt },
+      });
+
+      return {
+        message: "Payment success",
+        receiptId: receipt.id_receipt,
+        receipt,
+        amount,
+        month_status: "at_day",
+      };
     });
 
-    if (!fee)
-      return res.status(404).json({ error: 'Monthly fee not found' });
-
-    const amount = fee.student?.classe?.grade?.monthly_fee ?? 0;
-
-    const receipt = await prisma.receipt.create({
-      data: {
-        reference: `FSM${Date.now()}`,
-        total_amount: amount,
-      },
-    });
-
-    await prisma.monthlyFeeDetails.update({
-      where: { id_mthl_fd: id },
-      data: { receiptId: receipt.id_receipt },
-    });
-
-    res.json({
-      message: 'Payment success',
-      receiptId: receipt.id_receipt,
-      amount,
-      month_status: 'at_day',
-    });
+    res.json(result);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error' });
@@ -358,6 +238,11 @@ exports.makePayement = async (req, res) => {
    STUDENT PAYMENTS
 ========================= */
 exports.studentPayements = async (req, res) => {
+  const user = req.user;
+
+  if (!user) {
+      return res.status(401).json({ error: "Unauthorized" });
+  }
   try {
     const studentId = parseInt(req.body.student_id, 10);
     if (Number.isNaN(studentId))
@@ -381,13 +266,16 @@ exports.studentPayements = async (req, res) => {
       include: { receipt: true },
     });
 
-    const results = fees.map(f => ({
-      payement: {
-        ...f,
-        amount: student.classe?.grade?.monthly_fee ?? 0,
-      },
-      month_status: computeStatus(params, f, new Date()),
-    }));
+    const results = fees.map(f => {
+        const fee = enrichFee(f, student, params);
+
+        return {
+            payement: fee,
+            month_status: fee.status,
+            isCurrent: fee.isCurrent,
+            isPaid: fee.isPaid,
+        };
+    });
 
     res.json({ message: 'Student payements', results });
   } catch (e) {
@@ -402,11 +290,26 @@ const generateReceiptReference = async (code = 'FSM') => {
   const count = await prisma.receipt.count();
   return `${code}${dateStr}${count + 1}`;
 };
+const createReceipt = async (tx, amount) => {
+
+    return tx.receipt.create({
+        data: {
+            reference: await generateReceiptReference(),
+            total_amount: amount,
+        },
+    });
+
+};
 
 /* =========================
    CREATE RECEIPT
 ========================= */
-exports.createReceipt = async (req, res) => {
+exports.createReceiptController = async (req, res) => {
+  const user = req.user;
+  if (!user) {
+      return res.status(401).json({ error: "Unauthorized" });
+  }
+  
   const id = parseInt(req.params.id, 10);
   if (Number.isNaN(id)) {
     return res.status(400).json({ error: 'Invalid monthly fee detail id' });
@@ -425,21 +328,25 @@ exports.createReceipt = async (req, res) => {
     }
 
     const total_amount = monthlyFd.student?.classe?.grade?.monthly_fee ?? 0;
-    const reference = await generateReceiptReference('FSM');
 
-    const receipt = await prisma.receipt.create({
-      data: {
-        reference,
-        total_amount,
-      },
+    const result = await prisma.$transaction(async (tx) => {
+        const receipt = await createReceipt(tx, total_amount);
+
+        await tx.monthlyFeeDetails.update({
+            where: { id_mthl_fd: id },
+            data: {
+                receiptId: receipt.id_receipt,
+            },
+        });
+
+        return receipt;
     });
 
-    await prisma.monthlyFeeDetails.update({
-      where: { id_mthl_fd: id },
-      data: { receiptId: receipt.id_receipt },
+    return res.status(201).json({
+        message: "Receipt created successfully",
+        receipt: result,
     });
 
-    return res.status(201).json({ message: 'Receipt created successfully', receipt });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Server error' });
@@ -452,6 +359,10 @@ exports.createReceipt = async (req, res) => {
 exports.financialStats = async (req, res) => {
   try {
     const user = req.user;
+    if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const params = await getParams();
 
     // ❌ FIX IMPORTANT: ne PAS filtrer sur classe année (cause de ton 0 stats)
@@ -495,18 +406,23 @@ exports.financialStats = async (req, res) => {
 
     for (const fee of fees) {
       const student = studentMap[fee.studentId];
-      const price = student?.classe?.grade?.monthly_fee || 0;
+      const enrichedFee = enrichFee(
+          fee,
+          student,
+          params,
+          today
+      );
 
-      const info = computeStatus(params, fee, today);
+      const price = enrichedFee.amount;
 
-      switch (info.status) {
+      switch (enrichedFee.status) {
 
           case "at_day":
 
               stats.total_paid_number++;
               stats.total_paid_amount += price;
 
-              if (info.isCurrent) {
+              if (enrichedFee.isCurrent) {
                   stats.paid_this_month_num++;
                   stats.paid_this_month_aut += price;
               }
@@ -523,7 +439,7 @@ exports.financialStats = async (req, res) => {
 
           case "waiting":
 
-              if (info.isCurrent) {
+              if (enrichedFee.isCurrent) {
                   stats.this_month_overdue_num++;
                   stats.this_month_overdue_aut += price;
               }
@@ -535,7 +451,7 @@ exports.financialStats = async (req, res) => {
               stats.total_overdue_number++;
               stats.total_overdue_amount += price;
 
-              if (info.isCurrent) {
+              if (enrichedFee.isCurrent) {
                   stats.this_month_overdue_num++;
                   stats.this_month_overdue_aut += price;
               }

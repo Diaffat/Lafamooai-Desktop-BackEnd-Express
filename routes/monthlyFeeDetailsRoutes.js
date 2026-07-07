@@ -8,7 +8,7 @@ router.get('/financial_stats', controller.financialStats);
 router.get('/payement_infos', controller.payementInfos);
 router.post('/make_payement', controller.makePayement);
 router.post('/student_payements', controller.studentPayements);
-router.get('/:id/create_receipt', controller.createReceipt);
+router.get('/:id/create_receipt', controller.createReceiptController);
 router.get('/:id', controller.getMonthlyFeeDetailById);
 router.get('/', controller.getMonthlyFeeDetails);
 
