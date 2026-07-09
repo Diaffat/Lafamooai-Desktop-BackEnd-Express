@@ -98,6 +98,7 @@ exports.payementInfos = async (req, res) => {
     const today = new Date();
     
     const students = await getScopedStudents(user, params.school_years);
+    
     if (!students.length) return res.json({ results: [] });
 
     const fees = await prisma.monthlyFeeDetails.findMany({
@@ -119,47 +120,56 @@ exports.payementInfos = async (req, res) => {
     for (const s of students) {
       const studentFees = map[s.id_student] || [];
 
-      const inAdvance = [];
-      const overdue = [];
+      const statuses = {
+          overdue: [],
+          waiting: [],
+          in_coming: [],
+          in_advance: [],
+          at_day: [],
+      };
+
       let receipt = null;
-      let currentPaid = false;
 
       for (const f of studentFees) {
 
-        const fee = enrichFee(f, s, params, today);
+          const fee = enrichFee(f, s, params, today);
 
-        if (!receipt && fee.receiptId)
-            receipt = fee.receiptId;
+          if (!receipt && fee.receiptId)
+              receipt = fee.receiptId;
 
-        if (fee.status === "in_advance")
-            inAdvance.push(fee.month);
-
-        if (fee.status === "overdue")
-            overdue.push(fee.month);
-
-        if (fee.isCurrent && fee.status === "at_day")
-            currentPaid = true;
+          statuses[fee.status]?.push(fee.month);
       }
 
-      let status = 'at_day';
-      let months = [];
+      let payement_status = "at_day";
+      let month_details = [];
 
-      if (inAdvance.length) {
-        status = 'in_advance';
-        months = inAdvance;
-      } else if (currentPaid) {
-        status = 'at_day';
-        months = [actualMonth];
-      } else if (overdue.length) {
-        status = 'overdue';
-        months = overdue;
+      if (statuses.overdue.length) {
+          payement_status = "overdue";
+          month_details = statuses.overdue;
+      }
+      else if (statuses.waiting.length) {
+          payement_status = "waiting";
+          month_details = statuses.waiting;
+      }
+      else if (statuses.in_coming.length) {
+          payement_status = "in_coming";
+          month_details = statuses.in_coming;
+      }
+      else if (statuses.in_advance.length) {
+          payement_status = "in_advance";
+          month_details = statuses.in_advance;
+      }
+      else if (statuses.at_day.length) {
+          payement_status = "at_day";
+          month_details = statuses.at_day;
       }
 
       results.push({
         student: serializeStudent(s),
-        payement_status: status,
-        total_month: months.length,
-        month_details: months,
+        payement_status,
+        total_month: month_details.length,
+        month_details: month_details,
+        statuses,
         receipt,
       });
     }
@@ -218,12 +228,60 @@ exports.makePayement = async (req, res) => {
         data: { receiptId: receipt.id_receipt },
       });
 
+      const allFees = await tx.monthlyFeeDetails.findMany({
+          where: {
+              studentId: fee.studentId,
+              school_years: fee.school_years,
+          },
+      });
+      const statuses = {
+          overdue: [],
+          waiting: [],
+          in_coming: [],
+          at_day: [],
+          in_advance: [],
+      };
+
+      const today = new Date();
+      const params = await getParams();
+
+      for (const f of allFees) {
+          const info = enrichFee(f, fee.student, params, today);
+          statuses[info.status].push(info.month);
+      }
+      let payement_status = "at_day";
+      let month_details = [];
+
+      if (statuses.overdue.length) {
+          payement_status = "overdue";
+          month_details = statuses.overdue;
+      }
+      else if (statuses.waiting.length) {
+          payement_status = "waiting";
+          month_details = statuses.waiting;
+      }
+      else if (statuses.in_coming.length) {
+          payement_status = "in_coming";
+          month_details = statuses.in_coming;
+      }
+      else if (statuses.in_advance.length) {
+          payement_status = "in_advance";
+          month_details = statuses.in_advance;
+      }
+      else {
+          payement_status = "at_day";
+          month_details = statuses.at_day;
+      }
+
       return {
         message: "Payment success",
         receiptId: receipt.id_receipt,
         receipt,
         amount,
-        month_status: "at_day",
+
+        statuses,
+        payement_status,
+        month_details,
       };
     });
 
@@ -461,7 +519,12 @@ exports.financialStats = async (req, res) => {
     }
 
     return res.json({
-        results: [stats],
+      results: {
+        stats,
+        params: {
+          school_year: params.school_years,
+        },
+      },
     });
   } catch (err) {
     console.error(err);

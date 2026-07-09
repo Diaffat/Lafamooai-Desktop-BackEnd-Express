@@ -2,7 +2,7 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 async function main() {
- const fees = await prisma.monthlyFeeParams.findMany();
+ const fees = await prisma.monthlyFeeDetails.findMany();
 
 console.log(fees);
 }

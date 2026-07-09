@@ -10,6 +10,7 @@ const {
 const { createUserWithRole } = require("../services/authService");
 const { sendAccountsEmail } = require("../services/emailService");
 const { generateCNI } = require("../services/authService");
+const { getParams } = require("../utils/monthlyFeeDetailsUtils");
 
 const generateUsername = (base) => `${base}${crypto.randomInt(100, 999)}`;
 
@@ -551,6 +552,8 @@ const getStats = async (req, res) => {
     const inscribedWhere = {
       enrollement: { status: { in: INSCRIBED_STATUSES } },
     };
+    const params = await getParams();
+    const school_year = params.school_years;
 
     const demandes = await prisma.enrollement_student_info.count({
       where: { enrollement: { status: { not: "Accepted" } } },
@@ -590,8 +593,6 @@ const getStats = async (req, res) => {
       grade_stats[className] = (grade_stats[className] || 0) + 1;
     });
 
-    console.log(grade_stats);
-
     const acceptedStudents = await prisma.enrollement_student_info.findMany({
       where: inscribedWhere,
       include: { enrollement: true },
@@ -608,14 +609,31 @@ const getStats = async (req, res) => {
     const growth = Object.entries(growthMap)
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => (a.date > b.date ? 1 : -1));
+    
+    const totalEnrolmentFees = await prisma.receipt.aggregate({
+      where: {
+        feeDetails: {
+          some: {},
+        },
+      },
+      _sum: {
+        total_amount: true,
+      },
+    });
+    const totalFees = totalEnrolmentFees._sum.total_amount ?? 0;
 
     return res.json({
       demandes,
+      school_year,
       enrolled,
       enrolled_boys,
       enrolled_girls,
+
       grade_stats,
       growth,
+      totalFees,
+      total_classes: Object.keys(grade_stats).length
+
     });
   } catch (error) {
     console.error(error);

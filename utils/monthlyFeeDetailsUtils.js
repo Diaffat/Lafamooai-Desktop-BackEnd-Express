@@ -20,11 +20,28 @@ const createStats = () => ({
 /* =========================
    PARAMS (Django style source of truth)
 ========================= */
+const getCurrentSchoolYear = () => {
+    const today = new Date();
+
+    // Mois JS : 0 = janvier, ..., 11 = décembre
+    // Si l'année scolaire commence en septembre
+    const startMonth = 9;
+
+    const currentMonth = today.getMonth() + 1;
+    const currentYear = today.getFullYear();
+
+    if (currentMonth >= startMonth) {
+        return `${currentYear}-${currentYear + 1}`;
+    }
+
+    return `${currentYear - 1}-${currentYear}`;
+};
+
 const getParams = async () => {
   const p = await prisma.monthlyFeeParams.findFirst();
 
   return {
-    school_years: p?.school_years ?? "2026-2027",
+    school_years: p?.school_years ?? getCurrentSchoolYear(),
     start_month: p?.start_month ?? 9,
     end_month: p?.end_month ?? 6,
     deadline: p?.deadline ?? 15,
@@ -36,6 +53,12 @@ const getSchoolDate = (month, schoolYears, startMonth) => {
     const [startYear, endYear] =
         schoolYears.split("-").map(Number);
 
+    // Cas année civile (janvier → août ou janvier → décembre)
+    if (startMonth === 1) {
+        return new Date(endYear, month - 1, 1);
+    }
+
+    // Cas année scolaire classique (septembre → juin)
     return new Date(
         month >= startMonth
             ? startYear

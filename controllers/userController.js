@@ -3,6 +3,7 @@ const prisma = require("../prisma");
 const { BASE_URL } = process.env.BASE_URL;
 const { generatePassword } = require("./enrollementController");
 const { sendEmail } = require("../services/emailService");
+const { getParams } = require("../utils/monthlyFeeDetailsUtils");
 const bcrypt = require("bcrypt");
 
 // Utility function to build full image URL
@@ -327,7 +328,7 @@ exports.adminDash = async (req, res) => {
       days = "7",
       role = "all",
     } = req.query;
-
+    const params = await getParams();
     const parsedDays = parseInt(days) || 7;
 
     // ================= USERS STATS (SCALABLE) =================
@@ -541,6 +542,9 @@ exports.adminDash = async (req, res) => {
         attendances: formatted_stats,
         announcements,
         events,
+        params: {
+          school_year: params.school_years,
+        },
       },
       status: 200,
     });
