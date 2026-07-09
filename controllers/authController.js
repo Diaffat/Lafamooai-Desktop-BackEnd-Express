@@ -7,17 +7,19 @@ const { createUserWithRole } = require("../services/authService");
 
 const accessSECRET = process.env.ACCESS_SECRET;
 const refreshSECRET = process.env.REFRESH_SECRET;
-const BASE_URL = process.env.BASE_URL;
 
 // Utility function to build full image URL
 const buildImageUrl = (user) => {
-  if (user && user.img && !user.img.startsWith("http")) {
-    return {
-      ...user,
-      img: `${BASE_URL}/media/${user.img}`,
-    };
-  }
-  return user;
+  const BASE_URL = process.env.BASE_URL;
+
+  if (!user || !user.img) return user;
+
+  if (user.img.startsWith("http")) return user;
+
+  return {
+    ...user,
+    img: `${BASE_URL}/${user.img.replace(/^\/+/, "")}`,
+  };
 };
 
 // ================== LOGIN ==================
@@ -419,6 +421,7 @@ const changePassword = async (req, res) => {
 // ================== GET ME (Current User) ==================
 const getMe = async (req, res) => {
   try {
+    console.log("GET ME");
     // req.user is set by auth middleware
     if (!req.user) {
       return res.status(401).json({ error: "Not authenticated" });

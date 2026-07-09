@@ -8,6 +8,8 @@ const bcrypt = require("bcrypt");
 
 // Utility function to build full image URL
 const buildImageUrl = (user) => {
+  const BASE_URL = process.env.BASE_URL; 
+
   if (user && user.img && !user.img.startsWith('http')) {
     return {
       ...user,

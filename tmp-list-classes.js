@@ -2,9 +2,11 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 async function main() {
- const fees = await prisma.monthlyFeeDetails.findMany();
+ const user = await prisma.customUser.findUnique({
+  where: { id: 1 },
+});
 
-console.log(fees);
+console.log(user?.img);
 }
 
 main()
