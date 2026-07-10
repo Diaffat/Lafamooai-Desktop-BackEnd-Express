@@ -5,19 +5,7 @@ const { generatePassword } = require("./enrollementController");
 const { sendEmail } = require("../services/emailService");
 const { getParams } = require("../utils/monthlyFeeDetailsUtils");
 const bcrypt = require("bcrypt");
-
-// Utility function to build full image URL
-const buildImageUrl = (user) => {
-  const BASE_URL = process.env.BASE_URL; 
-
-  if (user && user.img && !user.img.startsWith('http')) {
-    return {
-      ...user,
-      img: `${BASE_URL}/media/${user.img}`
-    };
-  }
-  return user;
-};
+const { buildImageUrl } = require("../utils/buildImageUtils");
 
 // Apply to array of users
 const buildImageUrls = (users) => {

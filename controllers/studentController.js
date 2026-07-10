@@ -2,6 +2,7 @@
 const prisma = require("../prisma");
 const { serializeStudent } = require("../serializers/studentSerializer");
 const pageLimit = parseInt(process.env.pageLimit, 10);
+
 exports.getStudents = async (req, res) => {
   try {
     const { search, gender } = req.query;

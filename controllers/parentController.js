@@ -1,6 +1,7 @@
 // controllers/parent.controller.js
 const pageLimit = parseInt(process.env.pageLimit, 10);
 const prisma = require("../prisma");
+const { serializeParent } = require("../serializers/parentSerializer");
 
 exports.getParents = async (req, res) => {
   try {
@@ -42,7 +43,7 @@ exports.getParents = async (req, res) => {
       prisma.parent.count({ where }),
     ]);
 
-    res.json({ count: total, results: parents });
+    res.json({ count: total, results: parents.map(serializeParent) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
@@ -74,7 +75,7 @@ exports.getParentById = async (req, res) => {
       return res.status(404).json({ error: "Parent not found" });
     }
 
-    res.json(parent);
+    res.json(serializeParent(parent));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });

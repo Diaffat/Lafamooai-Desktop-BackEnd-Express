@@ -4,23 +4,10 @@ const jwt = require("jsonwebtoken");
 const { sendVerificationCode } = require("../services/emailService");
 const { verifyCode } = require("../services/verificationService");
 const { createUserWithRole } = require("../services/authService");
+const { buildImageUrl } = require("../utils/buildImageUtils");
 
 const accessSECRET = process.env.ACCESS_SECRET;
 const refreshSECRET = process.env.REFRESH_SECRET;
-
-// Utility function to build full image URL
-const buildImageUrl = (user) => {
-  const BASE_URL = process.env.BASE_URL;
-
-  if (!user || !user.img) return user;
-
-  if (user.img.startsWith("http")) return user;
-
-  return {
-    ...user,
-    img: `${BASE_URL}/${user.img.replace(/^\/+/, "")}`,
-  };
-};
 
 // ================== LOGIN ==================
 const login = async (req, res) => {

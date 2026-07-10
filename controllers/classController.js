@@ -1,5 +1,6 @@
 const prisma = require('../prisma');
 const { serializeSubject } = require('../serializers/subjectSerializer');
+const { serializeStudent } = require('../serializers/studentSerializer');
 
 const pageLimit = parseInt(process.env.pageLimit, 10);
 
@@ -82,6 +83,7 @@ exports.getClassById = async (req, res) => {
 
     res.json({
       ...classe,
+      students: classe.students?.map(serializeStudent) ?? [],
       grade: classe.gradeId ?? null,
       class_name: classe.name,
       effective: classe.students?.length ?? 0,
