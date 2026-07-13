@@ -1,6 +1,6 @@
 const pageLimit = parseInt(process.env.pageLimit, 10);
 const prisma = require("../prisma");
-
+const { serializeTeacher } = require("../serializers/teacherSerializer");
 
 exports.getTeachers = async (req, res) => {
   try {
@@ -63,7 +63,7 @@ exports.getTeachers = async (req, res) => {
     });
 
     // équivalent distinct() - maintenant géré par Prisma avec distinct: ['id_teacher']
-    res.json({ count: teachers.length, results: teachers });
+    res.json({ count: teachers.length, results: teachers.map(serializeTeacher) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
