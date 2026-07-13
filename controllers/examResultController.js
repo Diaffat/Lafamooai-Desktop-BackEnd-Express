@@ -4,6 +4,7 @@ const path = require("path");
 const handlebars = require("handlebars");
 const htmlPdf = require("html-pdf");
 const pageLimit = parseInt(process.env.pageLimit, 10);
+const ExamResultSerializer = require("../serializers/examResultSerializer");
 
 // Appreciation scale function
 const getAppreciation = (score) => {
@@ -58,13 +59,22 @@ exports.getExamResults = async (req, res) => {
     const total = await prisma.examResult.count({ where });
     const results = await prisma.examResult.findMany({
       where,
-      include: { student: true, exam: true },
+      include: { 
+        student: {
+          include: { classe: true },
+        }, 
+        exam: true },
       orderBy: { exam: { end_date: "desc" } },
       skip: (page - 1) * limit,
       take: limit,
     });
 
-    res.json({ count: total, results });
+    const serializedResults = results.map(ExamResultSerializer);
+
+    res.json({
+      count: total,
+      results: serializedResults,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
@@ -81,7 +91,12 @@ exports.getExamResultById = async (req, res) => {
 
     const result = await prisma.examResult.findUnique({
       where: { id_exam_result: id },
-      include: { student: true, exam: true, classe: true },
+      include: { 
+        student: {
+          include: { classe: true },
+        },
+         exam: true, 
+         classe: true },
     });
 
     if (!result) {
