@@ -12,7 +12,8 @@ exports.serializeStudent = (student) => ({
   parent: student?.parent
     ? {
         ...student.parent,
-        first_name: student.parent?.first_name ?? student.parent?.user?.first_name ?? student.parent?.user?.username ?? null,
+        first_name: student.parent?.first_name ?? student.parent?.user?.first_name ?? 
+                    student.parent?.user?.username ?? student.parent?.username ?? null,
         last_name: student.parent?.last_name ?? student.parent?.user?.last_name ?? student.parent?.user?.username ?? null,
         firstname: student.parent?.firstname ?? student.parent?.user?.first_name ?? student.parent?.user?.username ?? null,
         lastname: student.parent?.lastname ?? student.parent?.user?.last_name ?? student.parent?.user?.username ?? null,

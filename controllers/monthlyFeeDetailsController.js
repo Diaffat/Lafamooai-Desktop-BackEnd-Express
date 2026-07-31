@@ -165,12 +165,12 @@ exports.payementInfos = async (req, res) => {
       }
 
       results.push({
-        student: serializeStudent(s),
-        payement_status,
-        total_month: month_details.length,
-        month_details: month_details,
-        statuses,
-        receipt,
+          student: serializeStudent(s),
+          payement_status,
+          total_month: month_details.length,
+          month_details,
+          receipt,
+          statuses,
       });
     }
 

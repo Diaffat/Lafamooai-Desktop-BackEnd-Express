@@ -3,6 +3,7 @@ exports.serializeSubject = (subject) => {
 
   return {
     ...subject,
+    classe_name: subject.classe?.name,
     teacher: subject?.teacher ? {
       ...subject.teacher,
       id_teacher: subject.teacherId,

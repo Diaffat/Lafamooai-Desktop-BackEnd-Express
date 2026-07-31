@@ -71,9 +71,24 @@ exports.getClassById = async (req, res) => {
         students: {
           include: {
             account: true,
+            parent: {
+              include: {
+                user: true,
+              },
+            },
+            classe: true,
           },
         },
-        subjects: { include: { teacher: { include: { user: true } } } },
+        subjects: {
+          include: {
+            teacher: {
+              include: {
+                user: true,
+              },
+            },
+            classe: true,
+          },
+        },
       },
     });
 

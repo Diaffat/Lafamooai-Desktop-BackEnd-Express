@@ -76,7 +76,11 @@ const getScopedStudents = async (user, schoolYears) => {
 
   const include = {
     account: true,
-    parent: true,
+    parent: {
+        include: {
+            user: true
+        },
+    },
     classe: { include: { grade: true } },
   };
 
@@ -104,52 +108,59 @@ const getScopedStudents = async (user, schoolYears) => {
    PAYMENT STATUS (CENTRAL LOGIC)
 ========================= */
 const computeStatus = (params, fee, today = new Date()) => {
+    const startMonth = Number(params.start_month);
+    const endMonth = Number(params.end_month);
+    const currentMonth = today.getMonth() + 1;
+    const deadline = Number(params.deadline);
 
-    const feeDate = getSchoolDate(
-        Number(fee.month),
-        params.school_years,
-        params.start_month
-    );
+    // Liste des mois de l'année scolaire dans l'ordre
+    let schoolMonths = [];
 
-    const currentMonth = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        1
-    );
+    if (startMonth <= endMonth) {
+        // Exemple : Juin -> Août
+        for (let m = startMonth; m <= endMonth; m++) {
+            schoolMonths.push(m);
+        }
+    } else {
+        // Exemple : Septembre -> Juin
+        for (let m = startMonth; m <= 12; m++) {
+            schoolMonths.push(m);
+        }
+        for (let m = 1; m <= endMonth; m++) {
+            schoolMonths.push(m);
+        }
+    }
+
+    const feeMonth = Number(fee.month);
+
+    const currentIndex = schoolMonths.indexOf(currentMonth);
+    const feeIndex = schoolMonths.indexOf(feeMonth);
 
     const isPaid = !!fee.receiptId;
 
     let status;
 
-    if (feeDate > currentMonth) {
-
-        status = isPaid
-            ? "in_advance"
-            : "in_coming";
-
-    } else if (feeDate.getTime() === currentMonth.getTime()) {
-
-        if (isPaid)
+    if (feeIndex > currentIndex) {
+        // Mois futur
+        status = isPaid ? "in_advance" : "in_coming";
+    } else if (feeIndex === currentIndex) {
+        // Mois actuel
+        if (isPaid) {
             status = "at_day";
-
-        else if (today.getDate() <= params.deadline)
-            status = "waiting";
-
-        else
-            status = "overdue";
-
+        } else {
+            status = today.getDate() <= deadline
+                ? "waiting"
+                : "overdue";
+        }
     } else {
-
-        status = isPaid
-            ? "at_day"
-            : "overdue";
+        // Mois passé
+        status = isPaid ? "at_day" : "overdue";
     }
 
     return {
         status,
-        isCurrent:
-            feeDate.getTime() === currentMonth.getTime(),
-        isPaid
+        isCurrent: feeIndex === currentIndex,
+        isPaid,
     };
 };
 

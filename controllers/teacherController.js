@@ -57,7 +57,16 @@ exports.getTeachers = async (req, res) => {
 
       include: {
         user: true,
-        subjects: true,
+        subjects: {
+          include: {
+            classe: {
+              select: {
+                id_class: true,
+                name: true,
+              },
+            },
+          },
+        },
         supervisedClasses: true,
       },
     });

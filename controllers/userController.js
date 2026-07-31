@@ -124,7 +124,19 @@ exports.createUser = async (req, res) => {
       });
 
       if (role === "admin") {
-        await tx.admin.create({ data: { userId: user.id } })
+        const existingAdmin = await tx.admin.findFirst({
+          where: {
+            userId: user.id,
+          },
+        });
+
+        if (!existingAdmin) {
+          await tx.admin.create({
+            data: {
+              userId: user.id,
+            },
+          });
+        }
       }
 
       if (role === "teacher") {

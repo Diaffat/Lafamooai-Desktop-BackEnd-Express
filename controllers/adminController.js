@@ -6,8 +6,28 @@ const pageLimit = parseInt(process.env.pageLimit, 10);
 exports.getAdmins = async (req, res) => {
   try {
     const search = req.query.search || "";
-    const page = parseInt(req.query.page, pageLimit) || 1;
-    const limit = parseInt(req.query.limit, pageLimit) || pageLimit;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || pageLimit;
+
+    // Répare automatiquement les admins manquants
+    const adminUsers = await prisma.customUser.findMany({
+      where: {
+        role: "admin",
+      },
+      include: {
+        admins: true,
+      },
+    });
+
+    for (const user of adminUsers) {
+      if (user.admins.length === 0) {
+        await prisma.admin.create({
+          data: {
+            userId: user.id,
+          },
+        });
+      }
+    }
 
     const where = search
       ? {

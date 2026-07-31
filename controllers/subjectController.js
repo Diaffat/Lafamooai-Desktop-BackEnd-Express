@@ -44,7 +44,11 @@ exports.getSubjects = async (req, res) => {
         teacher:  {
           include: { user: true } // 👈 IMPORTANT
         },
-        classe: true,
+        classe: {
+          select: {
+            name: true,
+          },
+        },
         lessons: true
       },
       orderBy: { name: 'asc' },
