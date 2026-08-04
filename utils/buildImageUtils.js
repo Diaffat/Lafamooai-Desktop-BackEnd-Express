@@ -1,12 +1,20 @@
 // Utility function to build full image URL
 const buildImageUrl = (user) => {
-  const BASE_URL = process.env.BASE_URL;
+  let BASE_URL = process.env.BASE_URL || "";
+  BASE_URL = BASE_URL.trim().replace(/\/+$/, "");
 
   if (!user) return user;
 
   let img = user.img;
 
-  if (!img) return `${BASE_URL}/users/avatar.png`;
+  if (!img) {
+    return {
+      ...user,
+      img: `${BASE_URL}/media/users/avatar.png`,
+    };
+  }
+
+  img = img.toString().trim();
 
   if (img.startsWith("http")) {
     return {

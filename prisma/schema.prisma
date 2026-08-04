@@ -33,6 +33,7 @@ model CustomUser {
   sentMessages     Message[] @relation("sent_messages")
   receivedMessages Message[] @relation("received_messages")
   refreshTokens    RefreshToken[]
+  passwordResets   PasswordReset[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -58,6 +59,17 @@ model VerificationCode {
   email        String   @unique
   code         String
   date_created  DateTime @default(now())
+}
+
+/////////////////////// PasswordReset /////////////////////
+
+model PasswordReset {
+  id        Int        @id @default(autoincrement())
+  userId    Int
+  user      CustomUser @relation(fields: [userId], references: [id])
+  token     String     @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
 }
 
 /////////////////////// PaymentType ////////////////////////

@@ -18,11 +18,9 @@ const login = async (req, res) => {
 
   try {
     if (!loginInput || !password) {
-      return res
-        .status(401)
-        .json({
-          error: "Veuillez saisir votre identifiant et votre mot de passe.",
-        });
+      return res.status(401).json({
+        error: "Veuillez saisir votre identifiant et votre mot de passe.",
+      });
     }
 
     const user = await prisma.customUser.findFirst({
@@ -274,25 +272,40 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    // Generate reset token (valid for 1 hour)
-    const resetToken = jwt.sign(
-      { userId: user.id },
-      process.env.RESET_PASSWORD_SECRET || "reset_secret",
-      { expiresIn: "1h" },
+    // Generate a 6-digit numeric reset code and store it (ensure uniqueness)
+    let resetCode;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+      try {
+        await prisma.passwordReset.create({
+          data: {
+            userId: user.id,
+            token: resetCode,
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+          },
+        });
+        break; // created successfully
+      } catch (err) {
+        // If unique constraint collision (token already exists), retry
+        if (err && err.code === "P2002") {
+          resetCode = null;
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (!resetCode) {
+      return res
+        .status(500)
+        .json({ error: "Impossible de générer un code, réessayez." });
+    }
+
+    // Send numeric code via email
+    await sendVerificationCode(
+      email,
+      `Voici votre code de réinitialisation de mot de passe : ${resetCode}`,
     );
-
-    // Store reset token in database
-    await prisma.passwordReset.create({
-      data: {
-        userId: user.id,
-        token: resetToken,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
-      },
-    });
-
-    // TODO: Send reset email with link containing token
-    // const resetLink = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-    // await sendPasswordResetEmail(email, resetLink);
 
     res.json({
       message: "Un email de réinitialisation a été envoyé.",
@@ -307,45 +320,32 @@ const resetPassword = async (req, res) => {
 
 // ================== RESET PASSWORD CONFIRM ==================
 const resetPasswordConfirm = async (req, res) => {
-  const { token, new_password } = req.body;
+  const { code, new_password } = req.body;
 
   try {
-    // Verify token
-    let decoded;
-    try {
-      decoded = jwt.verify(
-        token,
-        process.env.RESET_PASSWORD_SECRET || "reset_secret",
-      );
-    } catch (error) {
-      return res.status(400).json({
-        error: "Lien invalide ou expiré.",
-      });
-    }
-
-    // Check if reset token exists and not expired
+    // Check if reset code exists and not expired
     const resetRecord = await prisma.passwordReset.findUnique({
-      where: { token },
+      where: { token: String(code) },
     });
 
     if (!resetRecord || resetRecord.expiresAt < new Date()) {
       return res.status(400).json({
-        error: "Lien invalide ou expiré.",
+        error: "Code invalide ou expiré.",
       });
     }
 
     // Hash new password
     const hashedPassword = await bcrypt.hash(new_password, 10);
 
-    // Update user password
+    // Update user password using userId from the reset record
     await prisma.customUser.update({
-      where: { id: decoded.userId },
+      where: { id: resetRecord.userId },
       data: { password: hashedPassword },
     });
 
-    // Delete used reset token
+    // Delete used reset code
     await prisma.passwordReset.delete({
-      where: { token },
+      where: { token: String(code) },
     });
 
     res.json({
@@ -361,7 +361,7 @@ const resetPasswordConfirm = async (req, res) => {
 
 // ================== CHANGE PASSWORD ==================
 const changePassword = async (req, res) => {
-  const userId = req.user?.id;
+  const userId = req.user?.id || req.user?.userId;
   const { new_password, confirm_password } = req.body;
 
   try {
