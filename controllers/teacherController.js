@@ -8,53 +8,56 @@ exports.getTeachers = async (req, res) => {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || pageLimit;
 
+    const where = search
+      ? {
+          OR: [
+            // Recherche dans les champs de CustomUser via la relation
+            {
+              user: {
+                username: { contains: search, mode: "insensitive" },
+              },
+            },
+            {
+              user: {
+                email: { contains: search, mode: "insensitive" },
+              },
+            },
+            {
+              user: {
+                tel: { contains: search, mode: "insensitive" },
+              },
+            },
+            {
+              user: {
+                address: { contains: search, mode: "insensitive" },
+              },
+            },
+            // relations
+            {
+              subjects: {
+                some: {
+                  name: { contains: search, mode: "insensitive" },
+                },
+              },
+            },
+            {
+              supervisedClasses: {
+                some: {
+                  name: { contains: search, mode: "insensitive" },
+                },
+              },
+            },
+          ],
+        }
+      : {};
+
+    const totalTeachers = await prisma.teacher.count({ where });
+
     const teachers = await prisma.teacher.findMany({
       skip: (page - 1) * limit,
       take: limit,
-      distinct: ['id_teacher'],
-      where: search
-        ? {
-            OR: [
-              // Recherche dans les champs de CustomUser via la relation
-              {
-                user: {
-                  username: { contains: search, mode: "insensitive" },
-                },
-              },
-              {
-                user: {
-                  email: { contains: search, mode: "insensitive" },
-                },
-              },
-              {
-                user: {
-                  tel: { contains: search, mode: "insensitive" },
-                },
-              },
-              {
-                user: {
-                  address: { contains: search, mode: "insensitive" },
-                },
-              },
-              // relations
-              {
-                subjects: {
-                  some: {
-                    name: { contains: search, mode: "insensitive" },
-                  },
-                },
-              },
-              {
-                supervisedClasses: {
-                  some: {
-                    name: { contains: search, mode: "insensitive" },
-                  },
-                },
-              },
-            ],
-          }
-        : {},
-
+      distinct: ["id_teacher"],
+      where,
       include: {
         user: true,
         subjects: {
@@ -72,7 +75,7 @@ exports.getTeachers = async (req, res) => {
     });
 
     // équivalent distinct() - maintenant géré par Prisma avec distinct: ['id_teacher']
-    res.json({ count: teachers.length, results: teachers.map(serializeTeacher) });
+    res.json({ count: totalTeachers, results: teachers.map(serializeTeacher) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
@@ -84,7 +87,7 @@ exports.getTeacherById = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid teacher id' });
+      return res.status(400).json({ error: "Invalid teacher id" });
     }
 
     const teacher = await prisma.teacher.findUnique({
@@ -93,17 +96,17 @@ exports.getTeacherById = async (req, res) => {
         user: true,
         subjects: { include: { classe: true } },
         supervisedClasses: true,
-      }
+      },
     });
 
     if (!teacher) {
-      return res.status(404).json({ error: 'Teacher not found' });
+      return res.status(404).json({ error: "Teacher not found" });
     }
 
     res.json(teacher);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -118,19 +121,19 @@ exports.createTeacher = async (req, res) => {
         email,
         tel,
         address,
-        ...(userId && { userId: parseInt(userId, 10) })
+        ...(userId && { userId: parseInt(userId, 10) }),
       },
       include: {
         user: true,
         subjects: true,
-        supervisedClasses: true
-      }
+        supervisedClasses: true,
+      },
     });
 
     res.status(201).json(teacher);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -139,7 +142,7 @@ exports.updateTeacher = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid teacher id' });
+      return res.status(400).json({ error: "Invalid teacher id" });
     }
 
     const { username, email, tel, address } = req.body;
@@ -150,19 +153,19 @@ exports.updateTeacher = async (req, res) => {
         ...(username && { username }),
         ...(email && { email }),
         ...(tel && { tel }),
-        ...(address && { address })
+        ...(address && { address }),
       },
       include: {
         user: true,
         subjects: true,
-        supervisedClasses: true
-      }
+        supervisedClasses: true,
+      },
     });
 
     res.json(teacher);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -171,16 +174,16 @@ exports.deleteTeacher = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid teacher id' });
+      return res.status(400).json({ error: "Invalid teacher id" });
     }
 
     await prisma.teacher.delete({
-      where: { id_teacher: id }
+      where: { id_teacher: id },
     });
 
-    res.json({ message: 'Teacher deleted successfully' });
+    res.json({ message: "Teacher deleted successfully" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };

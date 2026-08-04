@@ -101,8 +101,21 @@ exports.createUser = async (req, res) => {
     if (!["admin", "teacher"].includes(role)) {
       return res.status(400).json({ error: "Invalid role" });
     }
-    if (!username || !email || !role) {
-      return res.status(400).json({ error: "Missing required fields" });
+
+    if (role === "admin") {
+      if (!username || !email) {
+        return res.status(400).json({
+          error: "Nom d'utilisateur et email sont obligatoires pour un administrateur.",
+        });
+      }
+    }
+
+    if (role === "teacher") {
+      if (!firstName || !lastName) {
+        return res.status(400).json({
+          error: "Le prénom et le nom sont obligatoires pour un enseignant.",
+        });
+      }
     }
 
     const plainPassword = generatePassword();
@@ -111,7 +124,6 @@ exports.createUser = async (req, res) => {
     const createdUser = await prisma.$transaction(async (tx) => {
       const user = await tx.customUser.create({
         data: {
-        ...req.body,
         username,
         email,
         password: hashedPassword,
@@ -136,6 +148,11 @@ exports.createUser = async (req, res) => {
               userId: user.id,
             },
           });
+          await sendEmail({
+            to: email,
+            subject: "Votre compte Lafamooai",
+            text: `Bonjour,\n\nVotre compte a été créé.\n\nUsername: ${username}\nPassword: ${plainPassword}\n\nVeuillez changer votre mot de passe après connexion.`,
+          });
         }
       }
 
@@ -144,12 +161,6 @@ exports.createUser = async (req, res) => {
       }
 
       return user;
-    });
-
-    await sendEmail({
-      to: email,
-      subject: "Votre compte Lafamooai",
-      text: `Bonjour,\n\nVotre compte a été créé.\n\nUsername: ${username}\nPassword: ${plainPassword}\n\nVeuillez changer votre mot de passe après connexion.`,
     });
 
     res.status(201).json({
