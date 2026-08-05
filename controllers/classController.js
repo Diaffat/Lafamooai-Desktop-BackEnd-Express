@@ -1,6 +1,6 @@
-const prisma = require('../prisma');
-const { serializeSubject } = require('../serializers/subjectSerializer');
-const { serializeStudent } = require('../serializers/studentSerializer');
+const prisma = require("../prisma");
+const { serializeSubject } = require("../serializers/subjectSerializer");
+const { serializeStudent } = require("../serializers/studentSerializer");
 
 const pageLimit = parseInt(process.env.pageLimit, 10);
 
@@ -12,7 +12,7 @@ exports.getClasses = async (req, res) => {
 
     const where = {};
     if (search) {
-      where.name = { contains: search, mode: 'insensitive' };
+      where.name = { contains: search, mode: "insensitive" };
     }
 
     const total = await prisma.class.count({ where });
@@ -32,7 +32,7 @@ exports.getClasses = async (req, res) => {
         },
         subjects: { include: { teacher: { include: { user: true } } } },
       },
-      orderBy: { id_class: 'asc' },
+      orderBy: { id_class: "asc" },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -48,14 +48,14 @@ exports.getClasses = async (req, res) => {
     res.json({ count: total, results });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
 exports.getClassById = async (req, res) => {
   const classId = parseInt(req.params.id, 10);
   if (Number.isNaN(classId)) {
-    return res.status(400).json({ error: 'Invalid class id' });
+    return res.status(400).json({ error: "Invalid class id" });
   }
 
   try {
@@ -93,7 +93,7 @@ exports.getClassById = async (req, res) => {
     });
 
     if (!classe) {
-      return res.status(404).json({ error: 'Class not found' });
+      return res.status(404).json({ error: "Class not found" });
     }
 
     res.json({
@@ -106,16 +106,33 @@ exports.getClassById = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
 exports.createClass = async (req, res) => {
   try {
     const { name, capacity, annee_academique, grade, supervisor } = req.body;
+
+    if (!name || !name.toString().trim()) {
+      return res.status(400).json({ error: "Class name is required" });
+    }
+
+    const existingClass = await prisma.class.findFirst({
+      where: {
+        name: { equals: name.toString().trim(), mode: "insensitive" },
+      },
+    });
+
+    if (existingClass) {
+      return res
+        .status(409)
+        .json({ error: "A class with this name already exists" });
+    }
+
     const newClass = await prisma.class.create({
       data: {
-        name,
+        name: name.toString().trim(),
         capacity: capacity ? parseInt(capacity, 10) : undefined,
         annee_academique,
         gradeId: grade ? parseInt(grade, 10) : undefined,
@@ -126,22 +143,38 @@ exports.createClass = async (req, res) => {
     res.status(201).json(newClass);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
 exports.updateClass = async (req, res) => {
   const classId = parseInt(req.params.id, 10);
   if (Number.isNaN(classId)) {
-    return res.status(400).json({ error: 'Invalid class id' });
+    return res.status(400).json({ error: "Invalid class id" });
   }
 
   try {
     const { name, capacity, annee_academique, grade, supervisor } = req.body;
+
+    if (name && name.toString().trim()) {
+      const conflictingClass = await prisma.class.findFirst({
+        where: {
+          name: { equals: name.toString().trim(), mode: "insensitive" },
+          NOT: { id_class: classId },
+        },
+      });
+
+      if (conflictingClass) {
+        return res
+          .status(409)
+          .json({ error: "A class with this name already exists" });
+      }
+    }
+
     const updatedClass = await prisma.class.update({
       where: { id_class: classId },
       data: {
-        name,
+        name: name ? name.toString().trim() : undefined,
         capacity: capacity !== undefined ? parseInt(capacity, 10) : undefined,
         annee_academique,
         gradeId: grade ? parseInt(grade, 10) : undefined,
@@ -152,27 +185,27 @@ exports.updateClass = async (req, res) => {
     res.json(updatedClass);
   } catch (err) {
     console.error(err);
-    if (err.code === 'P2025') {
-      return res.status(404).json({ error: 'Class not found' });
+    if (err.code === "P2025") {
+      return res.status(404).json({ error: "Class not found" });
     }
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
 exports.deleteClass = async (req, res) => {
   const classId = parseInt(req.params.id, 10);
   if (Number.isNaN(classId)) {
-    return res.status(400).json({ error: 'Invalid class id' });
+    return res.status(400).json({ error: "Invalid class id" });
   }
 
   try {
     await prisma.class.delete({ where: { id_class: classId } });
-    res.json({ message: 'Class deleted successfully' });
+    res.json({ message: "Class deleted successfully" });
   } catch (err) {
     console.error(err);
-    if (err.code === 'P2025') {
-      return res.status(404).json({ error: 'Class not found' });
+    if (err.code === "P2025") {
+      return res.status(404).json({ error: "Class not found" });
     }
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
