@@ -118,16 +118,22 @@ exports.createClass = async (req, res) => {
       return res.status(400).json({ error: "Class name is required" });
     }
 
+    const trimmedName = name.toString().trim();
+    const normalizedYear = annee_academique
+      ? annee_academique.toString().trim()
+      : "2025-2026";
+
     const existingClass = await prisma.class.findFirst({
       where: {
-        name: { equals: name.toString().trim(), mode: "insensitive" },
+        name: trimmedName,
+        annee_academique: normalizedYear,
       },
     });
 
     if (existingClass) {
-      return res
-        .status(409)
-        .json({ error: "A class with this name already exists" });
+      return res.status(409).json({
+        error: `La classe "${trimmedName}" existe déjà pour l'année scolaire "${normalizedYear}".`,
+      });
     }
 
     const newClass = await prisma.class.create({
@@ -156,19 +162,39 @@ exports.updateClass = async (req, res) => {
   try {
     const { name, capacity, annee_academique, grade, supervisor } = req.body;
 
-    if (name && name.toString().trim()) {
-      const conflictingClass = await prisma.class.findFirst({
-        where: {
-          name: { equals: name.toString().trim(), mode: "insensitive" },
-          NOT: { id_class: classId },
-        },
-      });
+    const currentClass = await prisma.class.findUnique({
+      where: { id_class: classId },
+      select: { name: true, annee_academique: true },
+    });
 
-      if (conflictingClass) {
-        return res
-          .status(409)
-          .json({ error: "A class with this name already exists" });
-      }
+    if (!currentClass) {
+      return res.status(404).json({ error: "Class not found" });
+    }
+
+    const targetName =
+      name && name.toString().trim()
+        ? name.toString().trim()
+        : currentClass.name;
+    const targetYear = annee_academique
+      ? annee_academique.toString().trim()
+      : currentClass.annee_academique;
+
+    if (!targetName) {
+      return res.status(400).json({ error: "Class name is required" });
+    }
+
+    const conflictingClass = await prisma.class.findFirst({
+      where: {
+        name: targetName,
+        annee_academique: targetYear,
+        NOT: { id_class: classId },
+      },
+    });
+
+    if (conflictingClass) {
+      return res.status(409).json({
+        error: `La classe "${targetName}" existe déjà pour l'année scolaire "${targetYear}".`,
+      });
     }
 
     const updatedClass = await prisma.class.update({
