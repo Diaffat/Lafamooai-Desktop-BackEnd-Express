@@ -345,7 +345,8 @@ const createAccountsForEnrollment = async (enrollementId, prismaClient) => {
   }
 
   const tutorInfo = enrollementRecord.tutor;
-  const parentUsername = generateUsername(tutorInfo.firstname);
+  //const parentUsername = generateUsername(tutorInfo.firstname);
+  const parentUsername = tutorInfo.firstname;
   const parentPassword = generatePassword();
 
   const parentUser = await createUserWithRole({
@@ -385,7 +386,7 @@ const createAccountsForEnrollment = async (enrollementId, prismaClient) => {
     let accountCredentials = null;
 
     if (accountAllowed) {
-      const studentUsername = generateUsername(studentInfo.firstname);
+      const studentUsername = studentInfo.firstname;
       const studentPassword = generatePassword();
       const studentEmail = `${studentUsername}@lafamooai.local`;
 
