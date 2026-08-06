@@ -28,6 +28,8 @@ const createUserWithRole = async ({
   email,
   password,
   role,
+  first_name,
+  last_name,
   tel,
   address,
   gender,
@@ -52,6 +54,8 @@ const createUserWithRole = async ({
       if (tel !== undefined) updateData.tel = tel;
       if (address !== undefined) updateData.address = address;
       if (gender !== undefined) updateData.gender = gender;
+      if (first_name !== undefined) updateData.first_name = first_name;
+      if (last_name !== undefined) updateData.last_name = last_name;
 
       if (Object.keys(updateData).length > 0) {
         await prismaClient.customUser.update({
@@ -61,7 +65,7 @@ const createUserWithRole = async ({
       }
 
       if (role !== "student") {
-        await ensureRoleRecord(user.id, role, prismaClient);
+        await ensureRoleRecord(existingUser.id, role, prismaClient);
       }
 
       return existingUser;
@@ -75,6 +79,8 @@ const createUserWithRole = async ({
       email,
       password: hashedPassword,
       role,
+      first_name,
+      last_name,
       tel,
       address,
       gender,

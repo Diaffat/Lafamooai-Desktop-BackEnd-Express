@@ -351,9 +351,11 @@ const createAccountsForEnrollment = async (enrollementId, prismaClient) => {
 
   const parentUser = await createUserWithRole({
     username: parentUsername,
-    email: tutorInfo.email || `${parentUsername}@lafamooai.local`,
+    email: tutorInfo.email,
     password: parentPassword,
     role: "parent",
+    first_name: tutorInfo.firstname,
+    last_name: tutorInfo.lastname,
     tel: tutorInfo.tel,
     address: tutorInfo.address,
     gender: tutorInfo.gender,

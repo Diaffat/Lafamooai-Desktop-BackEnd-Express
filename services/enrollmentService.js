@@ -49,7 +49,7 @@ const registerEnrollment = async (enrollementId) => {
     const parentUser = await tx.customUser.create({
       data: {
         username: parentUsername,
-        email: tutor.email || `${parentUsername}@lafamooai.local`,
+        email: tutor.email ,
         password: hashedParentPassword,
         role: "parent",
         tel: tutor.tel,
