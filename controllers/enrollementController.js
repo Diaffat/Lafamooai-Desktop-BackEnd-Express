@@ -213,7 +213,8 @@ const customCreate = async (req, res) => {
       .json({ message: "Enrôlement réussi", data: serialized });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ error: "Server error" });
+    const message = error?.message || "Server error";
+    return res.status(500).json({ error: message });
   }
 };
 
@@ -301,7 +302,8 @@ const customUpdate = async (req, res) => {
       .json({ message: "Enrollement updated successfully", results: updated });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ error: "Server error" });
+    const message = error?.message || "Server error";
+    return res.status(500).json({ error: message });
   }
 };
 

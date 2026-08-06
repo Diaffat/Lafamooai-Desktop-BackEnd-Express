@@ -61,13 +61,10 @@ exports.getUsers = async (req, res) => {
 
     const users = await prisma.customUser.findMany({
       where,
-      orderBy: [
-        { username: "asc" }
-      ],
+      orderBy: [{ username: "asc" }],
     });
 
     res.json(buildImageUrls(users));
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
@@ -75,26 +72,23 @@ exports.getUsers = async (req, res) => {
 };
 
 const formatPrismaError = (err, res) => {
-  if (err?.code === 'P2002') {
-    const target = Array.isArray(err.meta?.target) ? err.meta.target.join(', ') : err.meta?.target;
-    return res.status(400).json({ error: `Duplicate value for unique field(s): ${target}` });
+  if (err?.code === "P2002") {
+    const target = Array.isArray(err.meta?.target)
+      ? err.meta.target.join(", ")
+      : err.meta?.target;
+    return res
+      .status(400)
+      .json({ error: `Duplicate value for unique field(s): ${target}` });
   }
 
   console.error(err);
-  return res.status(400).json({ error: 'Request failed', details: err });
+  return res.status(400).json({ error: "Request failed", details: err });
 };
 
 exports.createUser = async (req, res) => {
   try {
-    const {
-      username,
-      email,
-      role,
-      firstName,
-      lastName,
-      tel,
-      address
-    } = req.body;
+    const { username, email, role, firstName, lastName, tel, address } =
+      req.body;
 
     console.log("BODY RECEIVED:", req.body);
 
@@ -105,7 +99,8 @@ exports.createUser = async (req, res) => {
     if (role === "admin") {
       if (!username || !email) {
         return res.status(400).json({
-          error: "Nom d'utilisateur et email sont obligatoires pour un administrateur.",
+          error:
+            "Nom d'utilisateur et email sont obligatoires pour un administrateur.",
         });
       }
     }
@@ -124,15 +119,15 @@ exports.createUser = async (req, res) => {
     const createdUser = await prisma.$transaction(async (tx) => {
       const user = await tx.customUser.create({
         data: {
-        username,
-        email,
-        password: hashedPassword,
-        first_name: firstName || null,
-        last_name: lastName || null,
-        tel: tel || null,
-        address: address || null,
-        role,
-      },
+          username,
+          email,
+          password: hashedPassword,
+          first_name: firstName || null,
+          last_name: lastName || null,
+          tel: tel || null,
+          address: address || null,
+          role,
+        },
       });
 
       if (role === "admin") {
@@ -157,7 +152,7 @@ exports.createUser = async (req, res) => {
       }
 
       if (role === "teacher") {
-        await tx.teacher.create({ data: { userId: user.id } })
+        await tx.teacher.create({ data: { userId: user.id } });
       }
 
       return user;
@@ -167,7 +162,6 @@ exports.createUser = async (req, res) => {
       message: "User created successfully",
       user: createdUser,
     });
-
   } catch (err) {
     formatPrismaError(err, res);
   }
@@ -185,21 +179,25 @@ exports.updateUser = async (req, res) => {
     // Build update data - filter out empty fields
     // Map frontend field names to Prisma schema field names
     const fieldMapping = {
-      'name': null, // Not a direct field in schema
-      'first_name': 'first_name',
-      'last_name': 'last_name',
-      'email': 'email',
-      'phone': 'tel',
-      'address': 'address',
-      'gender': 'gender',
-      'avatar': 'img',
-      'bio': null // Not in schema
+      name: null, // Not a direct field in schema
+      first_name: "first_name",
+      last_name: "last_name",
+      email: "email",
+      phone: "tel",
+      address: "address",
+      gender: "gender",
+      avatar: "img",
+      bio: null, // Not in schema
     };
 
     const updateData = {};
-    
+
     for (const [bodyField, schemaField] of Object.entries(fieldMapping)) {
-      if (schemaField && req.body[bodyField] !== undefined && req.body[bodyField] !== '') {
+      if (
+        schemaField &&
+        req.body[bodyField] !== undefined &&
+        req.body[bodyField] !== ""
+      ) {
         updateData[schemaField] = req.body[bodyField];
       }
     }
@@ -223,7 +221,6 @@ exports.updateUser = async (req, res) => {
     });
 
     res.json(buildImageUrl(user));
-
   } catch (err) {
     formatPrismaError(err, res);
   }
@@ -263,7 +260,7 @@ exports.getStats = async (req, res) => {
 
     let days;
     try {
-      days = parseInt(raw_days.replace(/\//g, '').trim());
+      days = parseInt(raw_days.replace(/\//g, "").trim());
     } catch (e) {
       days = 7;
     }
@@ -272,18 +269,18 @@ exports.getStats = async (req, res) => {
 
     const users = await prisma.customUser.findMany({
       where: role_filter,
-      select: { createdAt: true, last_login: true }
+      select: { createdAt: true, last_login: true },
     });
 
     const toDayKey = (date) => {
       if (!date) return null;
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     };
 
     const connexionsMap = new Map();
     const joinMap = new Map();
 
-    users.forEach(user => {
+    users.forEach((user) => {
       const joinDate = toDayKey(new Date(user.createdAt));
       joinMap.set(joinDate, (joinMap.get(joinDate) || 0) + 1);
 
@@ -296,15 +293,23 @@ exports.getStats = async (req, res) => {
     const traffics = [];
     let cumulativeUsers = 0;
 
-    const startDate = days > 365
-      ? (() => {
-          if (users.length === 0) return today;
-          const minJoin = users.reduce((min, u) => u.createdAt < min ? u.createdAt : min, users[0].createdAt);
-          const result = new Date(minJoin);
-          result.setHours(0, 0, 0, 0);
-          return result;
-        })()
-      : new Date(today.getFullYear(), today.getMonth(), today.getDate() - (days - 1));
+    const startDate =
+      days > 365
+        ? (() => {
+            if (users.length === 0) return today;
+            const minJoin = users.reduce(
+              (min, u) => (u.createdAt < min ? u.createdAt : min),
+              users[0].createdAt,
+            );
+            const result = new Date(minJoin);
+            result.setHours(0, 0, 0, 0);
+            return result;
+          })()
+        : new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate() - (days - 1),
+          );
 
     let current = new Date(startDate);
     const endDate = new Date(today);
@@ -315,17 +320,20 @@ exports.getStats = async (req, res) => {
       cumulativeUsers += joinMap.get(dayStr) || 0;
 
       traffics.push({
-        name: current.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        name: current.toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
         date: dayStr,
         connexions,
-        utilisateurs: cumulativeUsers
+        utilisateurs: cumulativeUsers,
       });
 
       current.setDate(current.getDate() + 1);
     }
 
     res.json(traffics);
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Erreur serveur" });
@@ -334,13 +342,7 @@ exports.getStats = async (req, res) => {
 
 exports.adminDash = async (req, res) => {
   try {
-    const {
-      start_date,
-      end_date,
-      date,
-      days = "7",
-      role = "all",
-    } = req.query;
+    const { start_date, end_date, date, days = "7", role = "all" } = req.query;
     const params = await getParams();
     const parsedDays = parseInt(days) || 7;
 
@@ -365,13 +367,42 @@ exports.adminDash = async (req, res) => {
       prisma.customUser.count({ where: { role: "student", gender: "female" } }),
     ]);
 
+    // Compute role user id sets to avoid double counting users with multiple roles
+    const adminUsers = await prisma.admin.findMany({
+      select: { userId: true },
+    });
+    const teacherUsers = await prisma.teacher.findMany({
+      select: { userId: true },
+    });
+    const parentUsers = await prisma.parent.findMany({
+      select: { userId: true },
+    });
+    const studentUsers = await prisma.customUser.findMany({
+      where: { role: "student" },
+      select: { id: true },
+    });
+
+    const adminIds = new Set(adminUsers.map((u) => u.userId));
+    const teacherIds = new Set(teacherUsers.map((u) => u.userId));
+    const parentIds = new Set(parentUsers.map((u) => u.userId));
+    const studentIds = new Set(studentUsers.map((u) => u.id));
+
+    // Unique users across role-specific tables and student role
+    const distinctUserSet = new Set([
+      ...Array.from(adminIds),
+      ...Array.from(teacherIds),
+      ...Array.from(parentIds),
+      ...Array.from(studentIds),
+    ]);
+
     const user_stats = {
-      all: total,
-      admin: admins,
-      teacher: teachers,
-      parent: parents,
+      all: total, // total users in CustomUser table
+      admin: adminIds.size,
+      teacher: teacherIds.size,
+      parent: parentIds.size,
       student: studentsCount,
       inactive,
+      distinct_users: distinctUserSet.size, // number of unique users across roles
     };
 
     const student_stats = {
@@ -423,7 +454,7 @@ exports.adminDash = async (req, res) => {
       if (a.status === "absent") statsMap[day].absent++;
     }
 
-    const formatted_stats = DAY_ORDER.map(day => ({
+    const formatted_stats = DAY_ORDER.map((day) => ({
       day_of_week: day,
       present: statsMap[day]?.present || 0,
       absent: statsMap[day]?.absent || 0,
@@ -450,13 +481,19 @@ exports.adminDash = async (req, res) => {
       todayStr = today.toISOString().slice(0, 10);
     }
 
-    const startDateStr = startDate.getFullYear() + '-' + 
-      String(startDate.getMonth() + 1).padStart(2, '0') + '-' + 
-      String(startDate.getDate()).padStart(2, '0');
+    const startDateStr =
+      startDate.getFullYear() +
+      "-" +
+      String(startDate.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(startDate.getDate()).padStart(2, "0");
 
-    const todayStrLocal = endDate.getFullYear() + '-' + 
-      String(endDate.getMonth() + 1).padStart(2, '0') + '-' + 
-      String(endDate.getDate()).padStart(2, '0');
+    const todayStrLocal =
+      endDate.getFullYear() +
+      "-" +
+      String(endDate.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(endDate.getDate()).padStart(2, "0");
 
     const roleCondition = role !== "all" ? `AND role = '${role}'` : "";
 
@@ -482,15 +519,15 @@ exports.adminDash = async (req, res) => {
     const usersBeforeStart = await prisma.customUser.count({
       where: {
         createdAt: { lt: startDate },
-        ...(role !== "all" && { role })
-      }
+        ...(role !== "all" && { role }),
+      },
     });
 
     const loginMap = {};
-    logins.forEach(l => (loginMap[l.day] = Number(l.count)));
+    logins.forEach((l) => (loginMap[l.day] = Number(l.count)));
 
     const userMap = {};
-    usersGrowth.forEach(u => (userMap[u.day] = Number(u.count)));
+    usersGrowth.forEach((u) => (userMap[u.day] = Number(u.count)));
 
     // Calculer le nombre de jours entre startDate et todayStr
     function diffDays(a, b) {
@@ -508,14 +545,24 @@ exports.adminDash = async (req, res) => {
       const current = new Date(startDate);
       current.setDate(startDate.getDate() + i);
 
-      const key = current.getFullYear() + '-' + 
-        String(current.getMonth() + 1).padStart(2, '0') + '-' + 
-        String(current.getDate()).padStart(2, '0');
+      const key =
+        current.getFullYear() +
+        "-" +
+        String(current.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(current.getDate()).padStart(2, "0");
 
       cumulative += userMap[key] || 0;
 
-      const dateParts = key.split('-');
-      const name = dateParts[2] + ' ' + new Date(key + 'T00:00:00').toLocaleDateString("fr-FR", { month: "short" }) + ' ' + dateParts[0];
+      const dateParts = key.split("-");
+      const name =
+        dateParts[2] +
+        " " +
+        new Date(key + "T00:00:00").toLocaleDateString("fr-FR", {
+          month: "short",
+        }) +
+        " " +
+        dateParts[0];
 
       traffics.push({
         name: name,
@@ -561,7 +608,6 @@ exports.adminDash = async (req, res) => {
       },
       status: 200,
     });
-
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });

@@ -1,5 +1,6 @@
 const prisma = require("../prisma");
 const { generateSchoolMonths } = require("../utils/monthlyFeeUtils");
+const { createUserWithRole } = require("./authService");
 const bcrypt = require("bcrypt");
 const nodemailer = require("nodemailer");
 
@@ -41,26 +42,29 @@ const registerEnrollment = async (enrollementId) => {
 
     const tutor = enrollment.tutor;
 
-    // 👤 CREATE PARENT
-    const parentUsername = `${tutor.lastname}${randomInt(100, 999)}`;
+    // 👤 CREATE OR REUSE PARENT
+    const parentUsername = `${tutor.lastname}`;
     const parentPassword = `${randomInt(1000, 9999)}`;
-    const hashedParentPassword = await bcrypt.hash(parentPassword, 10);
+    const parentEmail = tutor.email?.trim()
+      ? tutor.email.trim()
+      : `${parentUsername}@lafamooai.local`;
 
-    const parentUser = await tx.customUser.create({
-      data: {
-        username: parentUsername,
-        email: tutor.email ,
-        password: hashedParentPassword,
-        role: "parent",
-        tel: tutor.tel,
-        address: tutor.address,
-        gender: tutor.gender,
-      },
+    const parentUser = await createUserWithRole({
+      username: parentUsername,
+      email: parentEmail,
+      password: parentPassword,
+      role: "parent",
+      first_name: tutor.firstname,
+      last_name: tutor.lastname,
+      tel: tutor.tel,
+      address: tutor.address,
+      gender: tutor.gender,
+      prismaClient: tx,
     });
 
-    const parent = await tx.parent.create({
-      data: { userId: parentUser.id },
-    });
+    const parent =
+      (await tx.parent.findFirst({ where: { userId: parentUser.id } })) ||
+      (await tx.parent.create({ data: { userId: parentUser.id } }));
 
     let message = `
       Tuteur: ${tutor.firstname} ${tutor.lastname}
@@ -148,8 +152,7 @@ const registerEnrollment = async (enrollementId) => {
         await tx.enrollementFeeDetails.create({
           data: {
             studentId: student.id_student,
-            student_enrol_infoId:
-              studentInfo.id_enrollement_student_info,
+            student_enrol_infoId: studentInfo.id_enrollement_student_info,
             receiptId: receipt.id_receipt,
           },
         });
@@ -158,7 +161,7 @@ const registerEnrollment = async (enrollementId) => {
 
         const schoolMonths = generateSchoolMonths(
           monthlyParams.start_month,
-          monthlyParams.end_month
+          monthlyParams.end_month,
         );
 
         // ⚡ BULK months
