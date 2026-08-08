@@ -93,7 +93,7 @@ const registerEnrollment = async (enrollementId) => {
 
       // 🔐 CREATE STUDENT ACCOUNT
       if (canHaveAccount) {
-        const username = `${studentInfo.firstname}${randomInt(100, 999)}`;
+        const username = `${studentInfo.firstname}${studentInfo.lastname}`;
         const password = `${randomInt(1000, 9999)}`;
         const hashed = await bcrypt.hash(password, 10);
 
@@ -125,6 +125,15 @@ const registerEnrollment = async (enrollementId) => {
           CNI: studentInfo.cni || "-",
           gender: studentInfo.gender,
           classeId: defaultClass?.id_class,
+        },
+      });
+      await tx.enrollement_student_info.update({
+        where: {
+          id_enrollement_student_info:
+            studentInfo.id_enrollement_student_info,
+        },
+        data: {
+          studentId: student.id_student,
         },
       });
 

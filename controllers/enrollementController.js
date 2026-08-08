@@ -79,21 +79,38 @@ const getEnrollments = async (req, res) => {
           tutor: true,
           students: {
             include: {
+
+              // ⭐ LE VRAI ÉTUDIANT
+              student: {
+                include: {
+                  account: true,
+                  parent: {
+                    include: {
+                      user: true,
+                    },
+                  },
+                  classe: true,
+                },
+              },
+
               demanded_class_level: true,
+
               class: {
                 select: {
-                 // id_class: true,
+                  id_class: true,
                   name: true,
                 },
               },
+
               feeDetails: {
                 include: {
-                  receipt: true, // 🔥 ICI
+                  receipt: true,
                 },
               },
+
               supporting_documents: true,
             },
-          },
+          }, 
         },
         orderBy: { submission_date: "desc" },
         skip: (page - 1) * limit,
@@ -142,7 +159,7 @@ const customCreate = async (req, res) => {
   try {
     const tutorData = req.body.tutor;
     const studentsData = req.body.students;
-    const schoolYear = req.body.school_year || "2025-2026";
+    const schoolYear = req.body.school_year;
 
     if (
       !tutorData ||
