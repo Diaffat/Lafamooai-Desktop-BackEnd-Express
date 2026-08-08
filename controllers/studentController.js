@@ -102,7 +102,12 @@ exports.getStudentById = async (req, res) => {
             user: true,
           },
         },
-        classe: true,
+        classe: {
+          include: {
+            grade: true,
+            subjects: true,
+          },
+        },
       },
     });
 
