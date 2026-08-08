@@ -116,3 +116,119 @@ exports.getStudentById = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
+exports.updateStudent = async (req, res) => {
+  const studentId = parseInt(req.params.id, 10);
+
+  if (isNaN(studentId)) {
+    return res.status(400).json({
+      error: "Invalid student id",
+    });
+  }
+
+  try {
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      address,
+      birthday,
+      bloodType,
+      gender,
+      classId,
+      img,
+    } = req.body;
+
+    const updatedStudent = await prisma.$transaction(async (tx) => {
+      // =========================
+      // 1. Vérifier l'étudiant
+      // =========================
+      const student = await tx.student.findUnique({
+        where: {
+          id_student: studentId,
+        },
+        include: {
+          account: true,
+        },
+      });
+
+      if (!student) {
+        throw new Error("Student not found");
+      }
+
+      // =========================
+      // 2. Mettre à jour le compte
+      // =========================
+      if (student.accountId) {
+        await tx.customUser.update({
+          where: {
+            id: student.accountId,
+          },
+          data: {
+            ...(email !== undefined && { email }),
+            ...(phone !== undefined && { tel: phone }),
+            ...(address !== undefined && { address }),
+            ...(gender !== undefined && { gender }),
+            ...(img !== undefined && { img }),
+            ...(firstName !== undefined && { first_name: firstName }),
+            ...(lastName !== undefined && { last_name: lastName }),
+          },
+        });
+      }
+
+      // =========================
+      // 3. Mettre à jour Student
+      // =========================
+      const updated = await tx.student.update({
+        where: {
+          id_student: studentId,
+        },
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+
+          birth_date: birthday
+            ? new Date(birthday)
+            : null,
+
+          // ⚠️ Prisma utilise blood_type
+          blood_type: bloodType || null,
+
+          gender: gender,
+
+          classeId: classId
+            ? Number(classId)
+            : null,
+        },
+
+        include: {
+          account: true,
+
+          parent: {
+            include: {
+              user: true,
+            },
+          },
+
+          classe: true,
+        },
+      });
+
+      return updated;
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Student updated successfully",
+      student: serializeStudent(updatedStudent),
+    });
+
+  } catch (err) {
+    console.error("UPDATE STUDENT ERROR:", err);
+
+    return res.status(500).json({
+      error: err.message || "Server error",
+    });
+  }
+};

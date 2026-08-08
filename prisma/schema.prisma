@@ -143,6 +143,10 @@ model enrollement_student_info {
   id_enrollement_student_info Int                   @id @default(autoincrement())
   enrollementId               Int?                  
   enrollement                 enrollement?          @relation(fields: [enrollementId], references: [id_enrollement])
+  
+  studentId                   Int?
+  student Student? @relation(fields: [studentId], references: [id_student])
+
   firstname                   String
   lastname                    String
   gender                      String                @default("masculin")
@@ -192,13 +196,15 @@ model Student {
   first_name  String?
   last_name   String?
   gender      String    @default("male")
+  blood_type  String?
+  birth_date  DateTime?
   
   classeId    Int?
   classe      Class?    @relation(fields: [classeId], references: [id_class])
   
   CNI         String
-  birth_date  DateTime?
-  
+
+  enrollements        enrollement_student_info[]
   attendances         Attendance[] @relation("students_set")
   examResults         ExamResult[]
   examResultDetails   ExamResultDetails[]
