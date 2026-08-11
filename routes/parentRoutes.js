@@ -5,5 +5,6 @@ const controller = require("../controllers/parentController");
 
 router.get("/", controller.getParents);
 router.get("/:id", controller.getParentById);
+router.patch("/:id", controller.updateParent);
 
 module.exports = router;
