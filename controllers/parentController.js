@@ -181,3 +181,76 @@ exports.updateParent = async (req, res) => {
     });
   }
 };
+
+exports.deleteParent = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+
+    if (Number.isNaN(id)) {
+      return res.status(400).json({
+        error: "Invalid parent id",
+      });
+    }
+
+    // Vérifier que le parent existe
+    const parent = await prisma.parent.findUnique({
+      where: {
+        id_parent: id,
+      },
+      include: {
+        user: true,
+        children: true,
+      },
+    });
+
+    if (!parent) {
+      return res.status(404).json({
+        error: "Parent not found",
+      });
+    }
+
+    const deletedParent = await prisma.$transaction(async (tx) => {
+
+      // 1. Détacher les enfants du parent
+      // Seulement si parentId est nullable dans Student
+      await tx.student.updateMany({
+        where: {
+          parentId: id,
+        },
+        data: {
+          parentId: null,
+        },
+      });
+
+      // 2. Supprimer le Parent
+      const deleted = await tx.parent.delete({
+        where: {
+          id_parent: id,
+        },
+      });
+
+      // 3. Supprimer le CustomUser associé
+      if (parent.userId) {
+        await tx.customUser.delete({
+          where: {
+            id: parent.userId,
+          },
+        });
+      }
+
+      return deleted;
+    });
+
+    return res.status(200).json({
+      message: "Parent supprimé avec succès",
+      parent: deletedParent,
+    });
+
+  } catch (err) {
+    console.error("DELETE PARENT ERROR:", err);
+
+    return res.status(500).json({
+      error: "Erreur lors de la suppression du parent",
+    });
+  }
+};
