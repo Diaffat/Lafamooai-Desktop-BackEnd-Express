@@ -304,8 +304,8 @@ model Schedule {
   id_schedule   Int       @id @default(autoincrement())
   day_of_week   String?
   date          DateTime?
-  start_time    DateTime?
-  end_time      DateTime?
+  start_time    String?
+  end_time      String?
 
   subjectId     Int?
   subject       Subject?  @relation(fields: [subjectId], references: [id_subject])

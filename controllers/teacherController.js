@@ -86,6 +86,7 @@ exports.getTeachers = async (req, res) => {
 exports.getTeacherById = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
+
     if (Number.isNaN(id)) {
       return res.status(400).json({ error: "Invalid teacher id" });
     }
@@ -94,19 +95,56 @@ exports.getTeacherById = async (req, res) => {
       where: { id_teacher: id },
       include: {
         user: true,
-        subjects: { include: { classe: true } },
+
+        // Matières enseignées
+        subjects: {
+          include: {
+            classe: true,
+          },
+        },
+
+        // Classes dont il est superviseur
         supervisedClasses: true,
       },
     });
 
     if (!teacher) {
-      return res.status(404).json({ error: "Teacher not found" });
+      return res.status(404).json({
+        error: "Teacher not found",
+      });
     }
 
-    res.json(teacher);
+    // Classes dans lesquelles le professeur enseigne
+    const classesMap = new Map();
+
+    teacher.subjects.forEach((subject) => {
+      if (subject.classe) {
+        classesMap.set(
+          subject.classe.id_class,
+          subject.classe
+        );
+      }
+    });
+
+    // Classes enseignées
+    const classes = Array.from(classesMap.values());
+
+    return res.json({
+      ...teacher,
+
+      // Liste des classes
+      classes,
+
+      // Nombre de classes
+      classesCount: classes.length,
+    });
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+
+    res.status(500).json({
+      error: "Erreur de Serveur",
+    });
   }
 };
 
@@ -140,32 +178,133 @@ exports.createTeacher = async (req, res) => {
 // Update teacher
 exports.updateTeacher = async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (Number.isNaN(id)) {
-      return res.status(400).json({ error: "Invalid teacher id" });
+    const teacherId = parseInt(req.params.id, 10);
+
+    if (Number.isNaN(teacherId)) {
+      return res.status(400).json({
+        error: "Invalid teacher id",
+      });
     }
 
-    const { username, email, tel, address } = req.body;
+    const {
+      username,
+      email,
+      firstName,
+      lastName,
+      phone,
+      address,
+      gender,
+      birthday,
+      hireDate,
+      department,
+      bio,
+      img,
+    } = req.body;
 
-    const teacher = await prisma.teacher.update({
-      where: { id_teacher: id },
-      data: {
-        ...(username && { username }),
-        ...(email && { email }),
-        ...(tel && { tel }),
-        ...(address && { address }),
-      },
-      include: {
-        user: true,
-        subjects: true,
-        supervisedClasses: true,
-      },
+    const updatedTeacher = await prisma.$transaction(async (tx) => {
+      // 1. Récupérer le teacher
+      const teacher = await tx.teacher.findUnique({
+        where: {
+          id_teacher: teacherId,
+        },
+      });
+
+      if (!teacher) {
+        throw new Error("Teacher not found");
+      }
+
+      // 2. Mettre à jour CustomUser
+      if (teacher.userId) {
+        await tx.customUser.update({
+          where: {
+            id: teacher.userId,
+          },
+          data: {
+            ...(username !== undefined && { username }),
+            ...(email !== undefined && { email }),
+            ...(firstName !== undefined && {
+              first_name: firstName,
+            }),
+            ...(lastName !== undefined && {
+              last_name: lastName,
+            }),
+            ...(phone !== undefined && {
+              tel: phone,
+            }),
+            ...(address !== undefined && {
+              address,
+            }),
+            ...(gender !== undefined && {
+              gender,
+            }),
+            //...(img !== undefined && {
+              //img,
+            //}),
+          },
+        });
+      }
+
+      // 3. Mettre à jour Teacher
+      const updated = await tx.teacher.update({
+        where: {
+          id_teacher: teacherId,
+        },
+        data: {
+          ...(birthday !== undefined && {
+            birth_date: birthday
+              ? new Date(birthday)
+              : null,
+          }),
+
+          ...(hireDate !== undefined && {
+            hire_date: hireDate
+              ? new Date(hireDate)
+              : null,
+          }),
+
+          ...(department !== undefined && {
+            department: department || null,
+          }),
+
+          ...(bio !== undefined && {
+            bio: bio || null,
+          }),
+        },
+
+        include: {
+          user: true,
+
+          subjects: {
+            include: {
+              classe: true,
+            },
+          },
+
+          supervisedClasses: true,
+        },
+      });
+
+      return updated;
     });
 
-    res.json(teacher);
+    return res.status(200).json({
+      success: true,
+      message: "Teacher updated successfully",
+      teacher: updatedTeacher,
+    });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    console.error("UPDATE TEACHER ERROR:", err);
+
+    if (err.message === "Teacher not found") {
+      return res.status(404).json({
+        error: "Teacher not found",
+      });
+    }
+
+    return res.status(500).json({
+      error: err.message || "Server error",
+    });
   }
 };
 
