@@ -1,5 +1,5 @@
 const { PrismaClient } = require("@prisma/client");
-
+const { getMachineId } = require("../utils/machineId");
 const prisma = new PrismaClient();
 
 
@@ -55,14 +55,12 @@ exports.createLicense = async (req, res) => {
 // ===============================
 exports.activateLicense = async (req, res) => {
   try {
-    const {
-      key,
-      machineId,
-    } = req.body || {};
+    const {key } = req.body || {};
+    const machineId = getMachineId();
 
     if (!key || !machineId) {
       return res.status(400).json({
-        error: "La clé et le machineId sont obligatoires",
+        error: "La clé de licence est obligatoire",
       });
     }
 
@@ -130,11 +128,12 @@ exports.activateLicense = async (req, res) => {
 // ===============================
 exports.verifyLicense = async (req, res) => {
   try {
-    const { key, machineId } = req.body || {};
+    const { key} = req.body || {};
+    const machineId = getMachineId();
 
     if (!key || !machineId) {
       return res.status(400).json({
-        error: "La clé et le machineId sont obligatoires",
+        error: "La clé de licence est obligatoire",
       });
     }
 

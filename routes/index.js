@@ -1,6 +1,7 @@
 // express_backend_lafamooai/routes/index.js
 const express = require('express');
 const router = express.Router();
+const licenseMiddleware = require("../middlewars/licenseMiddleware");
 
 // imports
 const studentRoutes = require('./studentRoutes');
@@ -18,6 +19,13 @@ const eventRoutes = require('./eventRoutes');
 
 // routes DRF
 router.use('/', authRoutes);
+
+// =====================================
+// PROTECTION LICENCE
+// =====================================
+
+router.use(licenseMiddleware);
+
 router.use('/users', userRoutes);
 router.use('/admins', adminRoutes);
 router.use('/students', studentRoutes);

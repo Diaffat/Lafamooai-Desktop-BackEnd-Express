@@ -23,5 +23,8 @@ node ./node_modules/prisma/build/index.js db push
 # ou
 npx prisma db push
 
+## Pour ouvrir prisma studio
+.\node_modules\.bin\prisma.cmd studio
+
 ## Pour demarrer le serveur, faire:
 node app.js
