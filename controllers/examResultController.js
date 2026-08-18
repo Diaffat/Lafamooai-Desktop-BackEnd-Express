@@ -612,7 +612,11 @@ exports.reportPdfDownloader = async (req, res) => {
     );
     res.send(pdfBuffer);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
+  console.error("PDF ERROR:", err);
+  console.error(err instanceof Error ? err.stack : err);
+
+  res.status(500).json({
+    error: err instanceof Error ? err.message : String(err),
+  });
+} 
 };
