@@ -86,7 +86,7 @@ exports.activateLicense = async (req, res) => {
       new Date() > new Date(license.expiresAt)
     ) {
       return res.status(403).json({
-        error: "Cette licence a expiré",
+        error: "Cette licence a expiré, veuillez contacter l'equipe LafamooAI pour la renouveler!",
       });
     }
 

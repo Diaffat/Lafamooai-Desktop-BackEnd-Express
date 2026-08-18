@@ -1,6 +1,6 @@
 {
   "name": "express_backend_lafamooai",
-  "version": "1.0.1",
+  "version": "1.0.8",
   "description": "",
   "main": "app.js",
   "scripts": {
@@ -24,9 +24,9 @@
     "node-machine-id": "^1.1.12",
     "nodemailer": "^8.0.5",
     "prisma": "^5.22.0",
-    "puppeteer": "^24.41.0"
+    "puppeteer": "^24.41.0",
+    "better-sqlite3": "^12.8.0"
   },
   "devDependencies": {
-    "better-sqlite3": "^12.8.0"
   }
 }
